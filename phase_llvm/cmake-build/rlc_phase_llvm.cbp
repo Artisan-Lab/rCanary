@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6"/>
+	<Project>
+		<Option title="rlc_phase_llvm"/>
+		<Option makefile_is_custom="1"/>
+		<Option compiler="clang"/>
+		<Option virtualFolders="CMake Files\;CMake Files\..\;CMake Files\..\..\;CMake Files\..\..\..\;CMake Files\..\..\..\..\;CMake Files\..\..\..\..\usr\;CMake Files\..\..\..\..\usr\local\;CMake Files\..\..\..\..\usr\local\opt\;CMake Files\..\..\..\..\usr\local\opt\llvm\;CMake Files\..\..\..\..\usr\local\opt\llvm\lib\;CMake Files\..\..\..\..\usr\local\opt\llvm\lib\cmake\;CMake Files\..\..\..\..\usr\local\opt\llvm\lib\cmake\llvm\;"/>
+		<Build>
+			<Target title="all">
+				<Option working_dir="/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 all"/>
+					<CompileFile command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="edit_cache">
+				<Option working_dir="/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 edit_cache"/>
+					<CompileFile command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="omp_gen">
+				<Option working_dir="/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 omp_gen"/>
+					<CompileFile command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="acc_gen">
+				<Option working_dir="/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 acc_gen"/>
+					<CompileFile command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="rlc_phase_llvm">
+				<Option output="/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/rlc_phase_llvm" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="clang"/>
+				<Compiler>
+					<Add option="-D__STDC_CONSTANT_MACROS"/>
+					<Add option="-D__STDC_FORMAT_MACROS"/>
+					<Add option="-D__STDC_LIMIT_MACROS"/>
+					<Add directory="/usr/local/opt/llvm/include"/>
+					<Add directory="/usr/local/opt/llvm/bin/../include/c++/v1"/>
+					<Add directory="/usr/local/Cellar/llvm/12.0.1/lib/clang/12.0.1/include"/>
+					<Add directory="/Library/Developer/CommandLineTools/SDKs/MacOSX11.sdk/usr/include"/>
+					<Add directory="/Library/Developer/CommandLineTools/SDKs/MacOSX11.sdk/System/Library/Frameworks"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 rlc_phase_llvm"/>
+					<CompileFile command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="rlc_phase_llvm/fast">
+				<Option output="/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/rlc_phase_llvm" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="clang"/>
+				<Compiler>
+					<Add option="-D__STDC_CONSTANT_MACROS"/>
+					<Add option="-D__STDC_FORMAT_MACROS"/>
+					<Add option="-D__STDC_LIMIT_MACROS"/>
+					<Add directory="/usr/local/opt/llvm/include"/>
+					<Add directory="/usr/local/opt/llvm/bin/../include/c++/v1"/>
+					<Add directory="/usr/local/Cellar/llvm/12.0.1/lib/clang/12.0.1/include"/>
+					<Add directory="/Library/Developer/CommandLineTools/SDKs/MacOSX11.sdk/usr/include"/>
+					<Add directory="/Library/Developer/CommandLineTools/SDKs/MacOSX11.sdk/System/Library/Frameworks"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 rlc_phase_llvm/fast"/>
+					<CompileFile command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="rebuild_cache">
+				<Option working_dir="/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 rebuild_cache"/>
+					<CompileFile command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="intrinsics_gen">
+				<Option working_dir="/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 intrinsics_gen"/>
+					<CompileFile command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j12 -f &quot;/Users/vaynnecol/WorkSpace/rlc/phase_llvm/cmake-build/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+		</Build>
+		<Unit filename="/Users/vaynnecol/WorkSpace/rlc/phase_llvm/main.cpp">
+			<Option target="rlc_phase_llvm"/>
+		</Unit>
+		<Unit filename="/Users/vaynnecol/WorkSpace/rlc/CMakeLists.txt">
+			<Option virtualFolder="CMake Files\"/>
+		</Unit>
+		<Unit filename="/Users/vaynnecol/WorkSpace/rlc/../../../../usr/local/opt/llvm/lib/cmake/llvm/LLVM-Config.cmake">
+			<Option virtualFolder="CMake Files\..\..\..\..\usr\local\opt\llvm\lib\cmake\llvm\"/>
+		</Unit>
+		<Unit filename="/Users/vaynnecol/WorkSpace/rlc/../../../../usr/local/opt/llvm/lib/cmake/llvm/LLVMConfig.cmake">
+			<Option virtualFolder="CMake Files\..\..\..\..\usr\local\opt\llvm\lib\cmake\llvm\"/>
+		</Unit>
+		<Unit filename="/Users/vaynnecol/WorkSpace/rlc/../../../../usr/local/opt/llvm/lib/cmake/llvm/LLVMConfigVersion.cmake">
+			<Option virtualFolder="CMake Files\..\..\..\..\usr\local\opt\llvm\lib\cmake\llvm\"/>
+		</Unit>
+		<Unit filename="/Users/vaynnecol/WorkSpace/rlc/../../../../usr/local/opt/llvm/lib/cmake/llvm/LLVMExports-release.cmake">
+			<Option virtualFolder="CMake Files\..\..\..\..\usr\local\opt\llvm\lib\cmake\llvm\"/>
+		</Unit>
+		<Unit filename="/Users/vaynnecol/WorkSpace/rlc/../../../../usr/local/opt/llvm/lib/cmake/llvm/LLVMExports.cmake">
+			<Option virtualFolder="CMake Files\..\..\..\..\usr\local\opt\llvm\lib\cmake\llvm\"/>
+		</Unit>
+	</Project>
+</CodeBlocks_project_file>
