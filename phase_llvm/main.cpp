@@ -22,10 +22,7 @@ static llvm::ManagedStatic<llvm::LLVMContext> GlobalContext;
 static llvm::cl::opt<std::string> InputFile(llvm::cl::Positional, llvm::cl::desc("<filename>.ll"), llvm::cl::Required);
 
 // The input of this binary is the dir to llvm-ir file
-// and the default dir in unix is '/tmp/rlc-llvm-ir/*.ll'
-
-extern void rlc_info_for_c(char* msg);
-
+// and the default dir in unix-like os is '/tmp/rlc-llvm-ir/*.ll'
 int main(int argc, char **argv) {
 
     if (argc == 0) {
@@ -37,13 +34,11 @@ int main(int argc, char **argv) {
     llvm::SMDiagnostic Err;
     // Format CLI Argument
     llvm::cl::ParseCommandLineOptions(argc, argv);
-    // Read and format llvm-bc file, 返回LLVM Module(Module是LLVM IR的顶级容器)
+    // Read and format llvm-bc file,
+    // Return the Module of LLVM
     std::unique_ptr<llvm::Module> M = parseIRFile(InputFile, Err, *GlobalContext);
 
-    std::string s = "123";
-    rlc_info_for_c(&s);
-
-    // 错误处理
+    // Error Handling for Parsing LLVM-IR
     if (!M) {
         Err.print(argv[0], llvm::errs());
         return 1;
@@ -68,7 +63,6 @@ int main(int argc, char **argv) {
             llvm::outs() << ")\n";
         }
     }
-
 
 
 }
