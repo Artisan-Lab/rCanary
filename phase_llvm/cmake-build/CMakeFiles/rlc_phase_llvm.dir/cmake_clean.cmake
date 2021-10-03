@@ -1,5 +1,6 @@
 file(REMOVE_RECURSE
   "CMakeFiles/rlc_phase_llvm.dir/phase_llvm/main.cpp.o"
+  "CMakeFiles/rlc_phase_llvm.dir/phase_llvm/test.cpp.o"
   "rlc_phase_llvm"
   "rlc_phase_llvm.pdb"
 )

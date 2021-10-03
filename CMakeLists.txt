@@ -41,7 +41,7 @@ add_definitions(${LLVM_DEFINITIONS_LIST})
 
 # Now build our tools
 # Need to modify the path to main.cpp
-add_executable(${PROJECT_NAME} phase_llvm/main.cpp) #to be done
+add_executable(${PROJECT_NAME} phase_llvm/main.cpp phase_llvm/test.h phase_llvm/test.cpp)
 
 # Find the libraries that correspond to the LLVM components
 # that we wish to use

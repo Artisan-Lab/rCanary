@@ -10,8 +10,8 @@ use std::fs;
 use wait_timeout::ChildExt;
 use walkdir::WalkDir;
 
-use rlc::log::Verbosity;
-use rlc::{rlc_info, rlc_error};
+use rlc::log::{Verbosity, rlc_error_and_exit};
+use rlc::{rlc_info};
 use rlc::{RLC_DEFAULT_ARGS, RLC_ROOT, RLC_LLVM_CACHE, RLC_LLVM_IR};
 
 use rustc_version::VersionMeta;
@@ -38,10 +38,6 @@ fn show_version() {
     println!("The RLC version: {}", version);
 }
 
-fn show_error(msg: impl AsRef<str>) -> ! {
-    rlc_error!("Fatal error in RLC: {}", msg.as_ref());
-    std::process::exit(1)
-}
 
 // Determines whether a `--flag` is present.
 fn has_arg_flag(name: &str) -> bool {
@@ -163,7 +159,7 @@ fn make_package() -> cargo_metadata::Package {
     };
     let mut metadata = match cmd.exec() {
         Ok(metadata) => metadata,
-        Err(e) => show_error(format!("Cannot obtain Cargo metadata: {}", e)),
+        Err(e) => rlc_error_and_exit(format!("Cannot obtain Cargo metadata: {}", e)),
     };
 
     let current_dir = env::current_dir();
@@ -185,7 +181,7 @@ fn make_package() -> cargo_metadata::Package {
             }
         })
         .unwrap_or_else(|| {
-            show_error("Workspace is not supported.");
+            rlc_error_and_exit("Workspace is not supported.");
         });
 
     metadata.packages.remove(package_index)
@@ -214,7 +210,7 @@ fn clean_package(package_name: &str) {
         .wait()
         .expect("Failed to wait for cargo")
         .success() {
-        show_error("Cargo clean failed");
+        rlc_error_and_exit("Cargo clean failed");
     }
 }
 
@@ -256,23 +252,11 @@ fn run_cmd(mut cmd: Command) {
     }
 }
 
-fn alter_triple_dir() {
-    let host = version_info().host;
-    if host.contains("windows") {
-        unsafe {
-            RLC_ROOT = "c:\\tmp\\rlc";
-            RLC_LLVM_CACHE = "c:\\tmp\\rlc\\rlc_llvm_cache";
-            RLC_LLVM_IR = "c:\\tmp\\rlc\\rlc_llvm_ir";
-        }
-    }
-    rlc_info!("Detecting host target triple: {}", &host);
-}
-
 fn rlc_create_dir<P: AsRef<Path>>(path: P, msg: impl AsRef<str>) {
     if fs::read_dir(&path).is_err() {
         fs::create_dir(path)
             .unwrap_or_else(|_|
-                show_error(msg)
+                rlc_error_and_exit(msg)
             );
     }
 }
@@ -281,7 +265,7 @@ fn rlc_remove_dir<P: AsRef<Path>>(path: P, msg: impl AsRef<str>) {
     if fs::read_dir(&path).is_ok() {
         fs::remove_dir_all(path)
             .unwrap_or_else(|_|
-                show_error(msg)
+                rlc_error_and_exit(msg)
             );
     }
 }
@@ -302,15 +286,13 @@ fn phase_preprocess() {
 
     // Make sure that the `rlc` and `rustc` binary are from the same sysroot.
     test_sysroot_consistency();
-    alter_triple_dir();
 
     let mut cmd = Command::new("cargo");
     cmd.arg("clean");
     run_cmd(cmd);
     rlc_info!("Running cargo clean for local package");
 
-
-    unsafe { rlc_remove_dir(RLC_ROOT, "Failed to init RLC root dir"); }
+    rlc_remove_dir(RLC_ROOT, "Failed to init RLC root dir");
 
     rlc_info!("Phase-Preprocess has been done");
 }
@@ -321,11 +303,9 @@ fn llvm_ir_emitter() {
     for target in targets {
 
         let mut cmd = Command::new("cargo");
-        unsafe {
-            cmd.arg("rustc")
-                .arg("--target-dir")
-                .arg(RLC_LLVM_CACHE);
-        }
+        cmd.arg("rustc")
+            .arg("--target-dir")
+            .arg(RLC_LLVM_CACHE);
 
         if !is_identified_target(&package, &target, &mut cmd) {
             continue;
@@ -340,87 +320,85 @@ fn llvm_ir_emitter() {
         }
 
         if let Err(e) = cmd.status() {
-            show_error(format!("Cannot emit llvm ir: {}", e));
+            rlc_error_and_exit(format!("Cannot emit llvm ir: {}", e));
         }
 
-        unsafe {
+        rlc_create_dir(RLC_LLVM_IR, "Failed to creat dir for llvm ir in /tmp");
 
-            rlc_create_dir(RLC_LLVM_IR, "Failed to creat dir for llvm ir in /tmp");
-
-            for entry in WalkDir::new(RLC_LLVM_CACHE) {
-                let entry_path = entry.unwrap().into_path();
-                let mut dest_path = PathBuf::from(RLC_LLVM_IR);
-                if entry_path
+        for entry in WalkDir::new(RLC_LLVM_CACHE) {
+            let entry_path = entry.unwrap().into_path();
+            let mut dest_path = PathBuf::from(RLC_LLVM_IR);
+            if entry_path
+                .iter()
+                .last()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .ends_with(".ll")
+                &&
+                entry_path
                     .iter()
-                    .last()
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .ends_with(".ll")
-                    &&
-                    entry_path
-                        .iter()
-                        .find(|s| s.to_str().unwrap().contains("deps"))
-                        .is_some()
-                {
-                    dest_path
-                        .push(
-                            format!(
-                                "{}_{}",
-                                TargetKind::from(&target),
-                                entry_path
-                                    .iter()
-                                    .last()
-                                    .unwrap()
-                                    .to_str()
-                                    .unwrap(),
-                            )
-                        );
+                    .find(|s| s.to_str().unwrap().contains("deps"))
+                    .is_some()
+            {
+                dest_path
+                    .push(
+                        format!(
+                            "{}_{}",
+                            TargetKind::from(&target),
+                            entry_path
+                                .iter()
+                                .last()
+                                .unwrap()
+                                .to_str()
+                                .unwrap(),
+                        )
+                    );
 
-                    fs::copy(&entry_path, &dest_path)
-                        .unwrap_or_else(|e|
-                            show_error(format!("Failed to copy llvm ir file {}",e) )
-                        );
+                fs::copy(&entry_path, &dest_path)
+                    .unwrap_or_else(|e|
+                        rlc_error_and_exit(format!("Failed to copy llvm ir file {}",e) )
+                    );
 
-                    rlc_info!("Successful to emit LLVM-IR file and transform to: {:?}", dest_path);
-                }
+                rlc_info!("Successful to emit LLVM-IR file and transform to: {:?}", dest_path);
             }
-
-            #[allow(unused_must_use)]
-            fs::remove_dir_all(RLC_LLVM_CACHE);
         }
+
+        fs::remove_dir_all(RLC_LLVM_CACHE)
+            .unwrap_or_else(|e| rlc_error_and_exit(format!("Failed to remove RLC_LLVM_Cache {}", e)));
     }
     rlc_info!("Ready for RLC Phase II-SubPhase: LLVM-IR-Emitter");
 }
 
 fn phase_llvm_ir() {
     rlc_info!("Ready for RLC Phase II: LLVM-IR");
-    //llvm_ir_emitter();
+
+    llvm_ir_emitter();
+
     let mut cmd = Command::new("rlc_phase_llvm");
-    unsafe {
-        if fs::read_dir(RLC_LLVM_IR).is_ok() {
-            for entry in WalkDir::new(RLC_LLVM_IR) {
-                let path = entry.unwrap().into_path();
-                if !path
-                    .iter()
-                    .last()
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .ends_with(".ll") {
-                    continue;
-                }
-                println!("{:?}", path);
-                cmd.arg(path);
-                break;
+
+    if fs::read_dir(RLC_LLVM_IR).is_ok() {
+        for entry in WalkDir::new(RLC_LLVM_IR) {
+            let path = entry.unwrap().into_path();
+            if !path
+                .iter()
+                .last()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .ends_with(".ll") {
+                continue;
             }
-        } else {
-            show_error("Failed to find RLC_LLVM_IR");
+            println!("{:?}", path);
+            cmd.arg(path);
+            break;
         }
+    } else {
+        rlc_error_and_exit("Failed to find RLC_LLVM_IR");
     }
 
     if let Err(e) = cmd.status() {
-        show_error(format!("RLC-PHASE-LLVM Loaded Failed {}", e));
+        rlc_error_and_exit(format!("RLC-PHASE-LLVM Loaded Failed {}", e));
     }
 
     rlc_info!("Phase-LLVM-IR has been done");
@@ -513,13 +491,13 @@ fn phase_cargo_rlc() {
         {
             Some(status) => {
                 if !status.success() {
-                    show_error("Finished with non-zero exit code");
+                    rlc_error_and_exit("Finished with non-zero exit code");
                 }
             }
             None => {
                 child.kill().expect("failed to kill subprocess");
                 child.wait().expect("failed to wait for subprocess");
-                show_error("Killed due to timeout");
+                rlc_error_and_exit("Killed due to timeout");
             }
         };
 
@@ -637,22 +615,22 @@ impl From<&cargo_metadata::Target> for TargetKind {
 }
 
 fn main() {
-    Verbosity::setting_up(Verbosity::Info).expect("Failed to set up RLC log system");
-
+    // Init the log_system for RLC
+    Verbosity::init_rlc_log_system_with_verbosity(Verbosity::Info).expect("Failed to set up RLC log system");
 
     if let Some("rlc") = env::args().nth(1).as_ref().map(AsRef::as_ref) {
         // `cargo rlc`: call `cargo rustc` for each applicable target,
         // but with the `RUSTC` env var set to the `cargo-rlc` binary so that we come back in the other branch,
         // and dispatch the invocations to `rustc` and `rlc`, respectively.
-        //phase_preprocess();
+        phase_preprocess();
         phase_llvm_ir();
-        //phase_cargo_rlc();
+        phase_cargo_rlc();
     } else if let Some("rustc") = env::args().nth(1).as_ref().map(AsRef::as_ref) {
         // `cargo rlc`: `RUSTC_WRAPPER` env var:
         // dependencies get dispatched to `rustc`, the final test/binary to `rlc`.
         phase_rustc_rlc();
     } else {
-        show_error("rlc must be called with either `rlc` or `rustc` as first argument.");
+        rlc_error_and_exit("rlc must be called with either `rlc` or `rustc` as first argument.");
     };
 
 }

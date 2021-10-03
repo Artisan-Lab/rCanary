@@ -11,7 +11,7 @@ pub enum Verbosity {
 }
 
 impl Verbosity {
-    pub fn setting_up(verbose: Verbosity) -> Result<(), fern::InitError> {
+    pub fn init_rlc_log_system_with_verbosity(verbose: Verbosity) -> Result<(), fern::InitError> {
         let mut dispatch = Dispatch::new();
 
         dispatch = match verbose {
@@ -55,6 +55,8 @@ impl Verbosity {
     }
 }
 
+
+
 #[macro_export]
 macro_rules! rlc_info {
     ($($arg:tt)+) => (
@@ -67,4 +69,9 @@ macro_rules! rlc_error {
     ($($arg:tt)+) => (
         ::log::error!(target: "rlc-output", $($arg)+)
     );
+}
+
+pub fn rlc_error_and_exit(msg: impl AsRef<str>) -> ! {
+    rlc_error!("Fatal error in RLC: {}", msg.as_ref());
+    std::process::exit(1)
 }

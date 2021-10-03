@@ -117,6 +117,12 @@
 		<Unit filename="/Users/vaynnecol/WorkSpace/rlc/phase_llvm/main.cpp">
 			<Option target="rlc_phase_llvm"/>
 		</Unit>
+		<Unit filename="/Users/vaynnecol/WorkSpace/rlc/phase_llvm/test.cpp">
+			<Option target="rlc_phase_llvm"/>
+		</Unit>
+		<Unit filename="/Users/vaynnecol/WorkSpace/rlc/phase_llvm/test.h">
+			<Option target="rlc_phase_llvm"/>
+		</Unit>
 		<Unit filename="/Users/vaynnecol/WorkSpace/rlc/CMakeLists.txt">
 			<Option virtualFolder="CMake Files\"/>
 		</Unit>

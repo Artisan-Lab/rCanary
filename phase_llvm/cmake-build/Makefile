@@ -192,6 +192,30 @@ phase_llvm/main.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/rlc_phase_llvm.dir/build.make CMakeFiles/rlc_phase_llvm.dir/phase_llvm/main.cpp.s
 .PHONY : phase_llvm/main.cpp.s
 
+phase_llvm/test.o: phase_llvm/test.cpp.o
+.PHONY : phase_llvm/test.o
+
+# target to build an object file
+phase_llvm/test.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rlc_phase_llvm.dir/build.make CMakeFiles/rlc_phase_llvm.dir/phase_llvm/test.cpp.o
+.PHONY : phase_llvm/test.cpp.o
+
+phase_llvm/test.i: phase_llvm/test.cpp.i
+.PHONY : phase_llvm/test.i
+
+# target to preprocess a source file
+phase_llvm/test.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rlc_phase_llvm.dir/build.make CMakeFiles/rlc_phase_llvm.dir/phase_llvm/test.cpp.i
+.PHONY : phase_llvm/test.cpp.i
+
+phase_llvm/test.s: phase_llvm/test.cpp.s
+.PHONY : phase_llvm/test.s
+
+# target to generate assembly for a file
+phase_llvm/test.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rlc_phase_llvm.dir/build.make CMakeFiles/rlc_phase_llvm.dir/phase_llvm/test.cpp.s
+.PHONY : phase_llvm/test.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -207,6 +231,9 @@ help:
 	@echo "... phase_llvm/main.o"
 	@echo "... phase_llvm/main.i"
 	@echo "... phase_llvm/main.s"
+	@echo "... phase_llvm/test.o"
+	@echo "... phase_llvm/test.i"
+	@echo "... phase_llvm/test.s"
 .PHONY : help
 
 

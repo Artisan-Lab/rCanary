@@ -44,7 +44,7 @@ impl Callbacks for RlcCompilerCalls {
         queries: &'tcx Queries<'tcx>,
     ) -> Compilation {
         compiler.session().abort_if_errors();
-        Verbosity::setting_up(self.rlc_config.verbose()).expect("Failed to set up RLC log system");
+        Verbosity::init_rlc_log_system_with_verbosity(self.rlc_config.verbose()).expect("Failed to set up RLC log system");
         //println!("{}: Input Source File: {:?}", get_local_time(), compiler.input().source_name());
         //println!("{}: Crate Name: {:?}", get_local_time(), queries.crate_name().unwrap().peek_mut());
 
