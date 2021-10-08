@@ -1,7 +1,7 @@
 #RLC -- Rust Leakage Checker
 
 This is the main source code repository for rlc.
-It contains the source code of **rlc**, **cargo-rlc**, **rust-llvm-heap-analysis-too\(rlc_phase_llvm)l** and the **constraint-solver**.
+It contains the source code of **rlc**, **cargo-rlc**, **rust-llvm-heap-analysis-tool (rlc_phase_llvm)** and the **rlc-constraint-solver**.
 
 Note: this **README** is for _users_ rather than _contributors_. 
 
@@ -38,6 +38,8 @@ Note: before running `install.sh` script, you should change current dir to the r
 git clone https://github.com/vaynnecol/rlc.git
 cd rlc
 ```
+
+To be done: not upload yet
 
 3. Configure the build settings:
 
@@ -108,3 +110,5 @@ Note: we do not advice the user to use the windows as host platform.
 
 ##Using RLC
 ... to be done
+
+including the optional arguments for rlc, the emitter dir and introduction, and the logging-output system (unfinished yet)
