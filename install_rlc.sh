@@ -11,6 +11,7 @@ mkdir "cmake-build"
 cd cmake-build || exit
 cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_DEPENDS_USE_COMPILER=FALSE -G "CodeBlocks - Unix Makefiles" "../../$(dirname "$0")"
 cmake --build "$(dirname "$0")" --target rlc_phase_llvm -v -- -j 9
-PAT="export PATH=\"\$PATH:${PWD}/\""
-echo $PAT >> ~/.zshrc
+p="export PATH=\"\$PATH:${PWD}/\""
+echo $p >> ~/.zshrc
+#echo $p >> ~/.bashrc
 export PATH="$PATH:${PWD}"
