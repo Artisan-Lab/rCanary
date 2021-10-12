@@ -135,7 +135,6 @@ fn run_complier(rlc_args: &mut RlcArgs) -> i32 {
     rustc_driver::catch_with_exit_code(move || run_compiler.run())
 }
 
-
 fn main() {
     // Installs a panic hook that will print the ICE message on unexpected panics.
     rustc_driver::install_ice_hook();
@@ -148,7 +147,6 @@ fn main() {
     }
 
     debug!("RLC-Args: {}", &rlc_args);
-
 
     let exit_code = run_complier(&mut rlc_args);
     std::process::exit(exit_code)

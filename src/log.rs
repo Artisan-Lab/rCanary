@@ -55,8 +55,6 @@ impl Verbosity {
     }
 }
 
-
-
 #[macro_export]
 macro_rules! rlc_info {
     ($($arg:tt)+) => (

@@ -38,7 +38,6 @@ fn show_version() {
     println!("The RLC version: {}", version);
 }
 
-
 // Determines whether a `--flag` is present.
 fn has_arg_flag(name: &str) -> bool {
     // Stop searching at `--`.
@@ -185,7 +184,6 @@ fn make_package() -> cargo_metadata::Package {
         });
 
     metadata.packages.remove(package_index)
-
 }
 
 fn make_package_with_sorted_target() -> (cargo_metadata::Package, Vec<cargo_metadata::Target>) {
@@ -236,7 +234,6 @@ fn is_identified_target(
     }
 }
 
-
 fn run_cmd(mut cmd: Command) {
     if env::var_os("RLC_VERBOSE").is_some() {
         rlc_info!("Command is: {:?}", cmd);
@@ -269,7 +266,6 @@ fn rlc_remove_dir<P: AsRef<Path>>(path: P, msg: impl AsRef<str>) {
             );
     }
 }
-
 
 fn phase_preprocess() {
 
@@ -408,6 +404,7 @@ fn phase_llvm_ir() {
 fn phase_cargo_rlc() {
 
     rlc_info!("Ready for RLC Phase III: Cargo-RLC");
+
     let (package, targets) = make_package_with_sorted_target();
     for target in targets {
         let mut args = env::args().skip(2);
@@ -504,7 +501,6 @@ fn phase_cargo_rlc() {
     }
 
     rlc_info!("Phase-Cargo-RLC has been done");
-
 }
 
 fn phase_rustc_rlc() {
@@ -621,8 +617,6 @@ fn phase_rustc_rlc() {
     };
 
 }
-
-
 
 #[repr(u8)]
 enum TargetKind {

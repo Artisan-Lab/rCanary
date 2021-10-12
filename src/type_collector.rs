@@ -4,8 +4,6 @@ use crate::context::RlcCtxt;
 
 pub struct TypeCollector<'tcx> {
     rcx: RlcCtxt<'tcx>,
-
-
 }
 
 impl<'tcx> TypeCollector<'tcx> {

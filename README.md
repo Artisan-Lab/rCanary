@@ -1,12 +1,12 @@
-#RLC -- Rust Leakage Checker
+# RLC -- Rust Leakage Checker
 
 This is the main source code repository for rlc.
 It contains the source code of **rlc**, **cargo-rlc**, **rust-llvm-heap-analysis-tool (rlc_phase_llvm)** and the **rlc-constraint-solver**.
 
 Note: this **README** is for _users_ rather than _contributors_. 
 
-##Quick Start
-###Installing from Source Code
+## Quick Start
+### Installing from Source Code
 
 The rlc build system uses a shell script called `install.sh` to build all components, which manages the compiling process.
 It lives in the root of the rlc project.
@@ -19,7 +19,7 @@ Note: before running `install.sh` script, you should change current dir to the r
 ./install.sh
 ```
 
-###Building on a Unix-like system
+### Building on a Unix-like system
 1. Make sure you have installed the dependencies:
 
    * clang++ 12.0 or later
@@ -71,7 +71,7 @@ echo $p >> ~/.bashrc
 
 When complete, `./install.sh` install will place several programs into `$PREFIX/bin`: `rlc`, the Rust Leakage Checker; `cargo-rlc`, the specific tool embedded in cargo to call `rlc`; `rlc_phase_llvm`, the tool to scan llvm-ir for rust crate and check the usage of heap resource; `rlc_solver`, the constraint solver for whole `rlc` system.
 
-###Building on Windows
+### Building on Windows
 
 There are two prominent ABIs in use on Windows: the native `MSVC` ABI used by Visual Studio, and the `GNU` ABI used by the GCC toolchain.
 
@@ -108,7 +108,7 @@ pacman -S git \
 
 Note: we do not advice the user to use the windows as host platform.
 
-##Using RLC
+## Using RLC
 ... to be done
 
 including the optional arguments for rlc, the emitter dir and introduction, and the logging-output system (unfinished yet)
