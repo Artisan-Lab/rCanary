@@ -53,7 +53,7 @@ impl Callbacks for RlcCompilerCalls {
         rlc_info!("RLC Stop");
 
         compiler.session().abort_if_errors();
-        Compilation::Stop
+        Compilation::Continue
     }
 }
 
@@ -131,8 +131,14 @@ fn run_complier(rlc_args: &mut RlcArgs) -> i32 {
     // Finally, add the default flags all the way in the beginning, but after the binary name.
     rlc_args.splice_args();
 
+    let rlc_final_args = rlc_args.args.clone();
+
     let run_compiler = rustc_driver::RunCompiler::new(&rlc_args.args, &mut rlc_args.rlc_cc);
-    rustc_driver::catch_with_exit_code(move || run_compiler.run())
+    let exit_code = rustc_driver::catch_with_exit_code(move || run_compiler.run());
+
+    rlc_info!("The arg for compilation is {:?}", rlc_final_args);
+
+    exit_code
 }
 
 fn main() {

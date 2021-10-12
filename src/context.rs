@@ -1,4 +1,5 @@
 use rustc_middle::ty::TyCtxt;
+
 use crate::RlcConfig;
 
 pub struct RlcGlobalCtxt<'tcx> {

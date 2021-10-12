@@ -13,6 +13,9 @@ name = "rlc"
 [[bin]]
 name = "cargo-rlc"
 
+[lib]
+name = "rlc"
+
 [dependencies]
 rustc_version = "0.4.0"
 cargo_metadata = "0.14.0"
