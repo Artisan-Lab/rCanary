@@ -527,7 +527,7 @@ fn phase_rustc_rlc() {
     fn is_current_compile_crate() -> bool {
 
         fn find_arg_with_rs_suffix() -> Option<String> {
-            let mut args = env::args().take_while(|s| s == "--");
+            let mut args = env::args().take_while(|s| s != "--");
             args.find(|s| s.ends_with(".rs"))
         }
 
@@ -554,12 +554,53 @@ fn phase_rustc_rlc() {
         false
     }
 
-    let use_rlc = is_current_compile_crate() && is_target_crate() || is_additional_compile_crate();
+    fn is_crate_type_lib() -> bool {
+        fn any_arg_flag<F>(name: &str, mut check: F) -> bool
+            where
+                F: FnMut(&str) -> bool,
+        {
+            // Stop searching at `--`.
+            let mut args = std::env::args().take_while(|val| val != "--");
+            loop {
+                let arg = match args.next() {
+                    Some(arg) => arg,
+                    None => return false,
+                };
+                if !arg.starts_with(name) {
+                    continue;
+                }
 
-    let cmd = if use_rlc {
+                // Strip leading `name`.
+                let suffix = &arg[name.len()..];
+                let value = if suffix.is_empty() {
+                    // This argument is exactly `name`; the next one is the value.
+                    match args.next() {
+                        Some(arg) => arg,
+                        None => return false,
+                    }
+                } else if suffix.starts_with('=') {
+                    // This argument is `name=value`; get the value.
+                    // Strip leading `=`.
+                    suffix[1..].to_owned()
+                } else {
+                    return false;
+                };
+
+                if check(&value) {
+                    return true;
+                }
+            }
+        }
+
+        any_arg_flag("--crate--type", TargetKind::is_lib_str)
+    }
+
+    let is_direct = is_current_compile_crate() && is_target_crate();
+    let is_additional = is_additional_compile_crate();
+
+    if is_direct || is_additional {
         let mut cmd = Command::new(find_rlc());
         cmd.args(env::args().skip(2));
-        cmd.arg("--emit=llvm-ir");
 
         // This is the local crate that we want to analyze with RLC.
         // (Testing `target_crate` is needed to exclude build scripts.)
@@ -571,15 +612,17 @@ fn phase_rustc_rlc() {
         let rlc_args: Vec<String> =
             serde_json::from_str(&magic).expect("failed to deserialize RLC_ARGS");
         cmd.args(rlc_args);
-        cmd
-    } else {
+        run_cmd(cmd);
+    }
+    if !is_direct || is_crate_type_lib() {
         let mut cmd = Command::new("rustc");
         cmd.args(env::args().skip(2));
-        cmd
+        run_cmd(cmd);
     };
 
-    run_cmd(cmd);
 }
+
+
 
 #[repr(u8)]
 enum TargetKind {
@@ -614,6 +657,12 @@ impl From<&cargo_metadata::Target> for TargetKind {
     }
 }
 
+impl TargetKind {
+    fn is_lib_str(s: &str) -> bool {
+        s == "lib" || s == "rlib" || s == "staticlib"
+    }
+}
+
 fn main() {
     // Init the log_system for RLC
     Verbosity::init_rlc_log_system_with_verbosity(Verbosity::Info).expect("Failed to set up RLC log system");
@@ -623,8 +672,8 @@ fn main() {
         // but with the `RUSTC` env var set to the `cargo-rlc` binary so that we come back in the other branch,
         // and dispatch the invocations to `rustc` and `rlc`, respectively.
         //phase_preprocess();
-        phase_llvm_ir();
-        //phase_cargo_rlc();
+        //phase_llvm_ir();
+        phase_cargo_rlc();
     } else if let Some("rustc") = env::args().nth(1).as_ref().map(AsRef::as_ref) {
         // `cargo rlc`: `RUSTC_WRAPPER` env var:
         // dependencies get dispatched to `rustc`, the final test/binary to `rlc`.

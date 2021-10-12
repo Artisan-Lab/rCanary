@@ -45,17 +45,12 @@ impl Callbacks for RlcCompilerCalls {
     ) -> Compilation {
         compiler.session().abort_if_errors();
         Verbosity::init_rlc_log_system_with_verbosity(self.rlc_config.verbose()).expect("Failed to set up RLC log system");
-        //println!("{}: Input Source File: {:?}", get_local_time(), compiler.input().source_name());
-        //println!("{}: Crate Name: {:?}", get_local_time(), queries.crate_name().unwrap().peek_mut());
 
-        // println!("{}: ", get_local_time());
-        rlc_info!("RLC Start:");
+        rlc_info!("RLC Start");
         queries.global_ctxt().unwrap().peek_mut().enter(
             |tcx| start_analyzer(tcx, self.rlc_config)
         );
-        rlc_info!("RLC Stop:");
-
-        println!(" RLC Stop");
+        rlc_info!("RLC Stop");
 
         compiler.session().abort_if_errors();
         Compilation::Stop
@@ -136,9 +131,6 @@ fn run_complier(rlc_args: &mut RlcArgs) -> i32 {
     // Finally, add the default flags all the way in the beginning, but after the binary name.
     rlc_args.splice_args();
 
-    // println!("{}: RLC-COMPILER PREPARATION SUCCESSFUL", get_local_time());
-    // println!("{}: RLC-ARGS: {}", get_local_time(), rlc_args);
-
     let run_compiler = rustc_driver::RunCompiler::new(&rlc_args.args, &mut rlc_args.rlc_cc);
     rustc_driver::catch_with_exit_code(move || run_compiler.run())
 }
@@ -147,8 +139,6 @@ fn run_complier(rlc_args: &mut RlcArgs) -> i32 {
 fn main() {
     // Installs a panic hook that will print the ICE message on unexpected panics.
     rustc_driver::install_ice_hook();
-
-    // println!("{}: RLC-MAIN ENTERING SUCCESSFUL", get_local_time());
 
     // Parse the config and arguments from env.
     let mut rlc_args = config_parse();
