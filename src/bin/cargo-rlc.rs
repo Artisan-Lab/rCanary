@@ -664,8 +664,8 @@ fn main() {
         // `cargo rlc`: call `cargo rustc` for each applicable target,
         // but with the `RUSTC` env var set to the `cargo-rlc` binary so that we come back in the other branch,
         // and dispatch the invocations to `rustc` and `rlc`, respectively.
-        phase_preprocess();
-        phase_llvm_ir();
+        //phase_preprocess();
+        //phase_llvm_ir();
         phase_cargo_rlc();
     } else if let Some("rustc") = env::args().nth(1).as_ref().map(AsRef::as_ref) {
         // `cargo rlc`: `RUSTC_WRAPPER` env var:

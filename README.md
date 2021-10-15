@@ -11,12 +11,12 @@ Note: this **README** is for _users_ rather than _contributors_.
 The rlc build system uses a shell script called `install.sh` to build all components, which manages the compiling process.
 It lives in the root of the rlc project.
 
-`install.sh` script can be run directly on most **unix-like** systems, such as mac-os, linux, etc.
+`install_rlc.sh` script can be run directly on most **unix-like** systems, such as mac-os, linux, etc.
 
-Note: before running `install.sh` script, you should change current dir to the root of rlc project.
+Note: before running `install_rlc.sh` script, you should change current dir to the root of rlc project.
 
 ```shell
-./install.sh
+./install_rlc.sh
 ```
 
 ### Building on a Unix-like system
@@ -29,7 +29,7 @@ Note: before running `install.sh` script, you should change current dir to the r
    * cmake 3.5 or later 
    * git
    * rustup 1.24 or later
-   * rustc/cargo nightly-2021-08-31 or later
+   * rustc/cargo nightly-2021-10-01 or later
    * cargo components: rust-src/rustc-dev
 
 2. Clone the source with git:
@@ -43,11 +43,11 @@ To be done: not upload yet
 
 3. Configure the build settings:
 
-The configuration of rlc building system can be modified in file `Cargo.toml` and `install.sh`.
+The configuration of rlc building system can be modified in file `Cargo.toml` and `install_rlc.sh`.
 The Rust build system uses a file named `Cargo.toml` in the root of the source tree to determine various configuration settings for the build.
 Specifically, `Cargo.toml` can option the compilation of **rlc** and **cargo-rlc**.
 
-`install.sh` can option the compilation of **rust-llvm-heap-analysis-tool**. The binary of this tool named as **rlc_phase_llvm** will be automated added to your system environment in this script.
+`install_rlc.sh` can option the compilation of **rust-llvm-heap-analysis-tool**. The binary of this tool named as **rlc_phase_llvm** will be automated added to your system environment in this script.
 
 ```shell
 #for debug version
@@ -66,10 +66,10 @@ echo $p >> ~/.bashrc
 
 4. Build and install:
 ```shell
-./install.sh
+./install_rlc.sh
 ```
 
-When complete, `./install.sh` install will place several programs into `$PREFIX/bin`: `rlc`, the Rust Leakage Checker; `cargo-rlc`, the specific tool embedded in cargo to call `rlc`; `rlc_phase_llvm`, the tool to scan llvm-ir for rust crate and check the usage of heap resource; `rlc_solver`, the constraint solver for whole `rlc` system.
+When complete, `./install_rlc.sh` install will place several programs into `$PREFIX/bin`: `rlc`, the Rust Leakage Checker; `cargo-rlc`, the specific tool embedded in cargo to call `rlc`; `rlc_phase_llvm`, the tool to scan llvm-ir for rust crate and check the usage of heap resource; `rlc_solver`, the constraint solver for whole `rlc` system.
 
 ### Building on Windows
 

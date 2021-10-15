@@ -14,6 +14,10 @@ impl<'tcx> RlcGlobalCtxt<'tcx> {
             config,
         }
     }
+
+    pub fn tcx(&self) -> TyCtxt<'tcx> {
+        self.tcx
+    }
 }
 
 pub type RlcCtxt<'tcx> = &'tcx RlcGlobalCtxt<'tcx>;
