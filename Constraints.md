@@ -206,6 +206,45 @@ pub enum StatementKind<'tcx> {
 
 ### Intra-procedural Analysis
 
+```rust
+// The ownership of RLC
+// all types that not having a heap chunck will be ignored in rlc
+```
+
+#### ADT Types Constraints (ATC)
+
+Give three structs: `Foo` `Bar` `Baz`, and all of them contain a pointer (include reference/raw pointer/slice/smart pointer) pointing to one place. For now, we assume that we do not know which kind of data (heap/stack) they are pointing at.
+
+```rust
+struct Foo<T> {
+   ptr_mut: *mut T,
+   ptr_immut: *const T,
+}
+
+struct Bar<T> {
+   ptr: *mut T,
+   _marker: PhantomData<T>,
+}
+
+struct Baz<T> {
+   ptr: Vec<T>,
+}
+```
+
+Now we give 3 heap-constraints for ADT types. For an ADT type:
+1. if one field is `[]`  `&mut T` `&T` => _**NOT OWNED**_
+2. if one field is `*mut T` `*const T` **but** not associated with `PhantomData<T>` => _**NOT OWNED**_
+3. if one field is `*mut T` `*const T` **and** associated with `PhantomData<T>` => _**OWNED**_: calculate sum of _**OWNED**_ pointer in this struct
+4. if one field is `PhantomData<T>` alone => search for other structs having `<T>` with raw pointer types => **depth:2** (eg. `NonNull<T>`)
+5. if one field is _**OWNED**_ type, marked the whole type and _**OWNED**_ field
+   1. if `COUNT` is `1` => the owner is whole **struct** but not `*mut T` etc..
+   2. if `COUNT` > `1` => mark each _**OWNED**_ filed in this struct
+6. **collections/boxed** types are regarding as _**OWNED**_ types to avoid analysis: `Box<T>` `String` `Rc<T>` `Vec<T>` etc.. (std::collections)
+7. if it is an anonymous-struct or a ~~tuple struct~~ => alike before
+8. if one variant is `[]` `*mut T` `*const T` `&mut T` `&T` => _**NOT OWNED**_
+9. if one variant is associated with a struct => _**Depend on the result of this struct**_
+
+How we perform ATC:
 1. Identify all structs and enums in library and binary crates, extract all types `Ty::ty` and cache them into one set. -> to json
     * Ideally, we will traverse all `Defid` with `tcx.optimized_mir()` and collect all types into this set
     * Through `tcx.optimized_mir()` we perform a easy inter-procedural operation to its callee and collect these types that defined in dependencies
@@ -214,8 +253,7 @@ pub enum StatementKind<'tcx> {
 2. Construct a dependency graph of all types through this set, and calculate the topo-order of all types.
 3. Use topo-order to analysis the constructor and destructor in llvm, the result is the `vector<bool>` to identify where one instance of this type will host actual heap.
 
-// The ownership of RLC
-// all types that not having a heap chunck will be ignored in rlc
+
 
 
 
