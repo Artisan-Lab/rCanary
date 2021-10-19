@@ -5,18 +5,18 @@
 
 ## Type Collector
 ### Data Structure
-1. Mir Local
 
+1. MIR LOCAL
 ```rust
 /// A MIR local.
 /// This can be a binding declared by the user, a temporary inserted by the compiler, a function
 /// argument, or the return place.
 #[derive(Clone, Debug, TyEncodable, TyDecodable, HashStable, TypeFoldable)]
 pub struct LocalDecl<'tcx> {
-/// Whether this is a mutable binding (i.e., `let x` or `let mut x`).
-///
-/// Temporaries and the return place are always mutable.
-pub mutability: Mutability,
+    /// Whether this is a mutable binding (i.e., `let x` or `let mut x`).
+    ///
+    /// Temporaries and the return place are always mutable.
+    pub mutability: Mutability,
 
     // FIXME(matthewjasper) Don't store in this in `Body`
     pub local_info: Option<Box<LocalInfo<'tcx>>>,
@@ -138,7 +138,7 @@ pub mutability: Mutability,
 ```
    
 
-2. Statement Kind
+2. STATEMENT KIND
 ```rust
 pub enum StatementKind<'tcx> {
    /// Write the RHS Rvalue to the LHS Place.
@@ -204,6 +204,165 @@ pub enum StatementKind<'tcx> {
 }
 ```
 
+3. TYS
+```rust
+#[allow(rustc::usage_of_ty_tykind)]
+pub struct TyS<'tcx> {
+    /// This field shouldn't be used directly and may be removed in the future.
+    /// Use `TyS::kind()` instead.
+    kind: TyKind<'tcx>,
+    /// This field shouldn't be used directly and may be removed in the future.
+    /// Use `TyS::flags()` instead.
+    flags: TypeFlags,
+
+    /// This is a kind of confusing thing: it stores the smallest
+    /// binder such that
+    ///
+    /// (a) the binder itself captures nothing but
+    /// (b) all the late-bound things within the type are captured
+    ///     by some sub-binder.
+    ///
+    /// So, for a type without any late-bound things, like `u32`, this
+    /// will be *innermost*, because that is the innermost binder that
+    /// captures nothing. But for a type `&'D u32`, where `'D` is a
+    /// late-bound region with De Bruijn index `D`, this would be `D + 1`
+    /// -- the binder itself does not capture `D`, but `D` is captured
+    /// by an inner binder.
+    ///
+    /// We call this concept an "exclusive" binder `D` because all
+    /// De Bruijn indices within the type are contained within `0..D`
+    /// (exclusive).
+    outer_exclusive_binder: ty::DebruijnIndex,
+}
+```
+
+4. TY KIND
+```rust
+/// Defines the kinds of types.
+///
+/// N.B., if you change this, you'll probably want to change the corresponding
+/// AST structure in `rustc_ast/src/ast.rs` as well.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, TyEncodable, TyDecodable, Debug)]
+#[derive(HashStable)]
+#[rustc_diagnostic_item = "TyKind"]
+pub enum TyKind<'tcx> {
+    /// The primitive boolean type. Written as `bool`.
+    Bool,
+
+    /// The primitive character type; holds a Unicode scalar value
+    /// (a non-surrogate code point). Written as `char`.
+    Char,
+
+    /// A primitive signed integer type. For example, `i32`.
+    Int(ty::IntTy),
+
+    /// A primitive unsigned integer type. For example, `u32`.
+    Uint(ty::UintTy),
+
+    /// A primitive floating-point type. For example, `f64`.
+    Float(ty::FloatTy),
+
+    /// Algebraic data types (ADT). For example: structures, enumerations and unions.
+    ///
+    /// InternalSubsts here, possibly against intuition, *may* contain `Param`s.
+    /// That is, even after substitution it is possible that there are type
+    /// variables. This happens when the `Adt` corresponds to an ADT
+    /// definition and not a concrete use of it.
+    Adt(&'tcx AdtDef, SubstsRef<'tcx>),
+
+    /// An unsized FFI type that is opaque to Rust. Written as `extern type T`.
+    Foreign(DefId),
+
+    /// The pointee of a string slice. Written as `str`.
+    Str,
+
+    /// An array with the given length. Written as `[T; n]`.
+    Array(Ty<'tcx>, &'tcx ty::Const<'tcx>),
+
+    /// The pointee of an array slice. Written as `[T]`.
+    Slice(Ty<'tcx>),
+
+    /// A raw pointer. Written as `*mut T` or `*const T`
+    RawPtr(TypeAndMut<'tcx>),
+
+    /// A reference; a pointer with an associated lifetime. Written as
+    /// `&'a mut T` or `&'a T`.
+    Ref(Region<'tcx>, Ty<'tcx>, hir::Mutability),
+
+    /// The anonymous type of a function declaration/definition. Each
+    /// function has a unique type, which is output (for a function
+    /// named `foo` returning an `i32`) as `fn() -> i32 {foo}`.
+    ///
+    /// For example the type of `bar` here:
+    ///
+    /// ```rust
+    /// fn foo() -> i32 { 1 }
+    /// let bar = foo; // bar: fn() -> i32 {foo}
+    /// ```
+    FnDef(DefId, SubstsRef<'tcx>),
+
+    /// A pointer to a function. Written as `fn() -> i32`.
+    ///
+    /// For example the type of `bar` here:
+    ///
+    /// ```rust
+    /// fn foo() -> i32 { 1 }
+    /// let bar: fn() -> i32 = foo;
+    /// ```
+    FnPtr(PolyFnSig<'tcx>),
+
+    /// A trait object. Written as `dyn for<'b> Trait<'b, Assoc = u32> + Send + 'a`.
+    Dynamic(&'tcx List<Binder<'tcx, ExistentialPredicate<'tcx>>>, ty::Region<'tcx>),
+
+    /// The anonymous type of a closure. Used to represent the type of
+    /// `|a| a`.
+    Closure(DefId, SubstsRef<'tcx>),
+
+    /// The anonymous type of a generator. Used to represent the type of
+    /// `|a| yield a`.
+    Generator(DefId, SubstsRef<'tcx>, hir::Movability),
+
+    /// A type representing the types stored inside a generator.
+    /// This should only appear in GeneratorInteriors.
+    GeneratorWitness(Binder<'tcx, &'tcx List<Ty<'tcx>>>),
+
+    /// The never type `!`.
+    Never,
+
+    /// A tuple type. For example, `(i32, bool)`.
+    /// Use `TyS::tuple_fields` to iterate over the field types.
+    Tuple(SubstsRef<'tcx>),
+
+    /// The projection of an associated type. For example,
+    /// `<T as Trait<..>>::N`.
+    Projection(ProjectionTy<'tcx>),
+
+    /// Opaque (`impl Trait`) type found in a return type.
+    /// The `DefId` comes either from
+    /// * the `impl Trait` ast::Ty node,
+    /// * or the `type Foo = impl Trait` declaration
+    /// The substitutions are for the generics of the function in question.
+    /// After typeck, the concrete type can be found in the `types` map.
+    Opaque(DefId, SubstsRef<'tcx>),
+
+    /// A type parameter; for example, `T` in `fn f<T>(x: T) {}`.
+    Param(ParamTy),
+
+    /// Bound type variable, used only when preparing a trait query.
+    Bound(ty::DebruijnIndex, BoundTy),
+
+    /// A placeholder type - universally quantified higher-ranked type.
+    Placeholder(ty::PlaceholderType),
+
+    /// A type variable used during type checking.
+    Infer(InferTy),
+
+    /// A placeholder for a type which could not be computed; this is
+    /// propagated to avoid useless error messages.
+    Error(DelaySpanBugEmitted),
+}
+```
+
 ### Intra-procedural Analysis
 
 ```rust
@@ -231,8 +390,21 @@ struct Baz<T> {
 }
 ```
 
+```rust
+struct Slice<'a, T> {
+    start: *const T,
+    end: *const T,
+}
+
+struct Slice<'a, T: 'a> {
+   start: *const T,
+   end: *const T,
+   phantom: PhantomData<&'a T>,
+}
+```
+
 Now we give 3 heap-constraints for ADT types. For an ADT type:
-1. if one field is `[]`  `&mut T` `&T` => _**NOT OWNED**_
+1. if one field is `[T]`  `&mut T` `&T` => _**NOT OWNED**_
 2. if one field is `*mut T` `*const T` **but** not associated with `PhantomData<T>` => _**NOT OWNED**_
 3. if one field is `*mut T` `*const T` **and** associated with `PhantomData<T>` => _**OWNED**_: calculate sum of _**OWNED**_ pointer in this struct
 4. if one field is `PhantomData<T>` alone => search for other structs having `<T>` with raw pointer types => **depth:2** (eg. `NonNull<T>`)
@@ -252,28 +424,3 @@ How we perform ATC:
     * Another choice is using `librustdoc` => the `Ty::ty` may not complete
 2. Construct a dependency graph of all types through this set, and calculate the topo-order of all types.
 3. Use topo-order to analysis the constructor and destructor in llvm, the result is the `vector<bool>` to identify where one instance of this type will host actual heap.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
