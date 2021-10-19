@@ -61,6 +61,14 @@ impl RlcConfig {
 
 }
 
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
+pub enum RlcPhase {
+    PreProcess,
+    LLVM,
+    Cargo,
+    Rustc,
+}
+
 /// Returns the "default sysroot" that RLC will use if no `--sysroot` flag is set.
 /// Should be a compile-time constant.
 pub fn compile_time_sysroot() -> Option<String> {

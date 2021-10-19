@@ -11,6 +11,7 @@ use wait_timeout::ChildExt;
 use walkdir::WalkDir;
 
 use rlc::log::{Verbosity, rlc_error_and_exit};
+use rlc::RlcPhase;
 use rlc::{rlc_info};
 use rlc::{RLC_DEFAULT_ARGS, RLC_ROOT, RLC_LLVM_CACHE, RLC_LLVM_IR};
 
@@ -234,8 +235,8 @@ fn is_identified_target(
     }
 }
 
-fn run_cmd(mut cmd: Command) {
-    if env::var_os("RLC_VERBOSE").is_some() {
+fn run_cmd(mut cmd: Command, phase: RlcPhase) {
+    if env::var_os("RLC_VERBOSE").is_some() && phase != RlcPhase::Rustc {
         rlc_info!("Command is: {:?}", cmd);
     }
 
@@ -285,7 +286,7 @@ fn phase_preprocess() {
 
     let mut cmd = Command::new("cargo");
     cmd.arg("clean");
-    run_cmd(cmd);
+    run_cmd(cmd, RlcPhase::PreProcess);
     rlc_info!("Running cargo clean for local package");
 
     rlc_remove_dir(RLC_ROOT, "Failed to init RLC root dir");
@@ -608,12 +609,12 @@ fn phase_rustc_rlc() {
         let rlc_args: Vec<String> =
             serde_json::from_str(&magic).expect("failed to deserialize RLC_ARGS");
         cmd.args(rlc_args);
-        run_cmd(cmd);
+        run_cmd(cmd, RlcPhase::Rustc);
     }
     if !is_direct || is_crate_type_lib() {
         let mut cmd = Command::new("rustc");
         cmd.args(env::args().skip(2));
-        run_cmd(cmd);
+        run_cmd(cmd, RlcPhase::Rustc);
     };
 
 }
@@ -664,8 +665,8 @@ fn main() {
         // `cargo rlc`: call `cargo rustc` for each applicable target,
         // but with the `RUSTC` env var set to the `cargo-rlc` binary so that we come back in the other branch,
         // and dispatch the invocations to `rustc` and `rlc`, respectively.
-        //phase_preprocess();
-        //phase_llvm_ir();
+        phase_preprocess();
+        phase_llvm_ir();
         phase_cargo_rlc();
     } else if let Some("rustc") = env::args().nth(1).as_ref().map(AsRef::as_ref) {
         // `cargo rlc`: `RUSTC_WRAPPER` env var:
