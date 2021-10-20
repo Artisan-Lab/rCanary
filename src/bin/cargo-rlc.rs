@@ -46,6 +46,12 @@ fn has_arg_flag(name: &str) -> bool {
     args.any(|val| val == name)
 }
 
+fn has_rlc_arg_flag(name: &str) -> bool {
+    // Begin searching at `--`
+    let mut args = env::args().skip_while(|val| val == "--");
+    args.any(|val| val == name)
+}
+
 /// Yields all values of command line flag `name`.
 struct ArgFlagValueIter<'a> {
     args: TakeWhile<env::Args, fn(&String) -> bool>,
@@ -268,6 +274,18 @@ fn rlc_remove_dir<P: AsRef<Path>>(path: P, msg: impl AsRef<str>) {
     }
 }
 
+fn rlc_add_env(cmd: &mut Command) {
+    if has_rlc_arg_flag("-MIR=V") {
+        cmd.env("MIR_DISPLAY", "VERBOSE");
+        //println!("1");
+    }
+    if has_rlc_arg_flag("-MIR=VV") {
+        cmd.env("MIR_DISPLAY", "VERY VERBOSE");
+        //println!("2");
+    }
+    //println!("3");
+}
+
 fn phase_preprocess() {
 
     let mut args = env::args();
@@ -419,7 +437,7 @@ fn phase_cargo_rlc() {
             continue;
         }
 
-        let verbose = has_arg_flag("-v");
+        let verbose = has_arg_flag("-v") || has_arg_flag("-vv");
         if !cfg!(debug_assertions) && !verbose {
             cmd.arg("-q");
         }
@@ -472,10 +490,18 @@ fn phase_cargo_rlc() {
         // // harder.
         let cargo_rlc_path = env::current_exe().expect("current executable path invalid");
         cmd.env("RUSTC_WRAPPER", &cargo_rlc_path);
+
         if verbose {
-            cmd.env("RLC_VERBOSE", ""); // this makes `inside_cargo_rustc` verbose.
+            if has_arg_flag("-v") {
+                cmd.env("RLC_VERBOSE", "VERBOSE"); // this makes `inside_cargo_rustc` verbose.
+            }
+            if has_arg_flag("-vv") {
+                cmd.env("RLC_VERBOSE", "VERY VERBOSE"); // this makes `inside_cargo_rustc` verbose.
+            }
             rlc_info!("Command is: {:?}", cmd);
         }
+
+        rlc_add_env(&mut cmd);
 
         rlc_info!("Running RLC for target {}:{}", TargetKind::from(&target), &target.name);
 
