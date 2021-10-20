@@ -12,6 +12,7 @@ use rustc_middle::ty::TyCtxt;
 use crate::grain::RlcGrain;
 use crate::log::Verbosity;
 use crate::context::RlcGlobalCtxt;
+use crate::display::MirDisplay;
 use crate::type_collector::TypeCollector;
 
 pub mod grain;
@@ -32,6 +33,7 @@ pub static RLC_LLVM_IR:&str = "/tmp/rlc/rlc-llvm-ir";
 pub struct RlcConfig {
     grain: RlcGrain,
     verbose: Verbosity,
+    mir_display: MirDisplay,
 }
 
 impl Default for RlcConfig {
@@ -39,15 +41,17 @@ impl Default for RlcConfig {
         Self {
             grain: RlcGrain::Low,
             verbose: Verbosity::Info,
+            mir_display: MirDisplay::Disabled,
         }
     }
 }
 
 impl RlcConfig {
-    pub fn new(grain: RlcGrain, verbose: Verbosity) -> Self {
+    pub fn new(grain: RlcGrain, verbose: Verbosity, mir_display: MirDisplay) -> Self {
         Self {
             grain,
             verbose,
+            mir_display,
         }
     }
 
@@ -58,6 +62,10 @@ impl RlcConfig {
     pub fn verbose(&self) -> Verbosity { self.verbose }
 
     pub fn set_verbose(&mut self, verbose: Verbosity) { self.verbose = verbose; }
+
+    pub fn mir_display(&self) -> MirDisplay { self.mir_display }
+
+    pub fn set_mir_display(&mut self, mir_display: MirDisplay) { self.mir_display = mir_display; }
 
 }
 
@@ -112,7 +120,7 @@ pub fn start_analyzer(tcx: TyCtxt, config: RlcConfig) {
     run_analyzer(
         "Type Collector",
         ||
-                TypeCollector::new(&rcx).start()
+                TypeCollector::new(&rcx, config).start()
     );
 
 

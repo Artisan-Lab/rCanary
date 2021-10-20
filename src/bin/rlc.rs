@@ -14,6 +14,7 @@ use std::env;
 use std::fmt::{Display, Formatter};
 
 use rlc::{RlcConfig, compile_time_sysroot, RLC_DEFAULT_ARGS, start_analyzer};
+use rlc::display::MirDisplay;
 use rlc::grain::RlcGrain;
 use rlc::log::Verbosity;
 use rlc::rlc_info;
@@ -91,6 +92,10 @@ impl RlcArgs {
 
     pub fn set_config_ultra(&mut self) { self.rlc_cc.rlc_config.set_grain(RlcGrain::Ultra); }
 
+    pub fn set_mir_display_verbose(&mut self) {self.rlc_cc.rlc_config.set_mir_display(MirDisplay::Verbose); }
+
+    pub fn set_mir_display_very_verbose(&mut self) {self.rlc_cc.rlc_config.set_mir_display(MirDisplay::VeryVerobse); }
+
     pub fn push_args(&mut self, arg: String) { self.args.push(arg); }
 
     pub fn splice_args(&mut self) {
@@ -102,10 +107,12 @@ fn config_parse() -> RlcArgs {
     let mut rlc_args = RlcArgs::default();
     for arg in env::args() {
         match arg.as_str() {
-            "-rlc-grain-low" => rlc_args.set_config_low(),
-            "-rlc-grain-medium" => rlc_args.set_config_medium(),
-            "-rlc-grain-high" => rlc_args.set_config_high(),
-            "-rlc-grain-ultra" => rlc_args.set_config_ultra(),
+            "-GRAIN=LOW" => rlc_args.set_config_low(),
+            "-GRAIN=MEDIUM" => rlc_args.set_config_medium(),
+            "-GRAIN=HIGH" => rlc_args.set_config_high(),
+            "-GRAIN=ULTRA" => rlc_args.set_config_ultra(),
+            "-MIR=V" => rlc_args.set_mir_display_verbose(),
+            "-MIR=VV" => rlc_args.set_mir_display_very_verbose(),
             _ => rlc_args.push_args(arg),
         }
     }
