@@ -1,4 +1,5 @@
 use std::env;
+use std::ffi::OsString;
 
 use rustc_middle::mir::terminator::{Terminator, TerminatorKind};
 use rustc_middle::mir::{Operand, Rvalue, Statement, StatementKind, BasicBlock, BasicBlockData, Body};
@@ -17,10 +18,40 @@ pub trait Display {
 const NEXT_LINE:&str = "\n";
 const PADDING:&str = "    ";
 
+#[derive(Debug, Copy, Clone, Hash)]
+pub enum MirDisplay {
+    Verbose,
+    VeryVerobse,
+    Disabled,
+}
+
+pub fn is_display_verbose() -> bool {
+    match env::var_os("MIR_DISPLAY") {
+        Some(verbose)  => match verbose.as_os_str().to_str().unwrap() {
+            "VERBOSE" => true,
+            "VERY VERBOSE" => true,
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
+pub fn is_display_very_verbose() -> bool {
+    match env::var_os("MIR_DISPLAY") {
+        Some(verbose)  => match verbose.as_os_str().to_str().unwrap() {
+            "VERY VERBOSE" => true,
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
 impl<'tcx> Display for Terminator<'tcx> {
     fn display(&self) -> String {
         let mut s = String::new();
-        s += &format!("{}{}{:?}", self.kind.display(), PADDING, self.kind);
+        if is_display_verbose() {
+            s += &format!("{}{}{:?}", self.kind.display(), PADDING, self.kind);
+        }
         s
     }
 }
@@ -28,7 +59,7 @@ impl<'tcx> Display for Terminator<'tcx> {
 impl<'tcx> Display for TerminatorKind<'tcx>{
     fn display(&self) -> String {
         let mut s = String::new();
-        if env::var_os("RLC_VERBOSE").is_some() {
+        if is_display_very_verbose() {
             s += PADDING;
             match self {
                 TerminatorKind::Goto { target:_ } =>
@@ -83,7 +114,9 @@ impl<'tcx> Display for TerminatorKind<'tcx>{
 impl<'tcx> Display for Statement<'tcx> {
     fn display(&self) -> String {
         let mut s = String::new();
-        s += &format!("{}{}{:?}", self.kind.display(), PADDING, self.kind);
+        if is_display_verbose() {
+            s += &format!("{}{}{:?}", self.kind.display(), PADDING, self.kind);
+        }
         s
     }
 }
@@ -91,7 +124,7 @@ impl<'tcx> Display for Statement<'tcx> {
 impl<'tcx> Display for StatementKind<'tcx> {
     fn display(&self) -> String {
         let mut s = String::new();
-        if env::var_os("RLC_VERBOSE").is_some() {
+        if is_display_very_verbose() {
             s += PADDING;
             match self {
                 StatementKind::Assign(ref assign) => {
@@ -130,7 +163,7 @@ impl<'tcx> Display for StatementKind<'tcx> {
 impl<'tcx> Display for Rvalue<'tcx> {
     fn display(&self) -> String {
         let mut s = String::new();
-        if env::var_os("RLC_VERBOSE").is_some() {
+        if is_display_very_verbose() {
             match self {
                 Rvalue::Use(_) =>
                     s += "Rvalue Use",
@@ -173,10 +206,12 @@ type BasicBlocks<'tcx> = IndexVec<BasicBlock, BasicBlockData<'tcx>>;
 impl<'tcx> Display for BasicBlocks<'tcx> {
     fn display(&self) -> String {
         let mut s = String::new();
-        let mut count = 0;
-        for bb in self.iter() {
-            s += &format!("bb {} {{{}{}}}{}", count, NEXT_LINE, bb.display(), NEXT_LINE);
-            count = count + 1;
+        if is_display_verbose() {
+            let mut count = 0;
+            for bb in self.iter() {
+                s += &format!("bb {} {{{}{}}}{}", count, NEXT_LINE, bb.display(), NEXT_LINE);
+                count = count + 1;
+            }
         }
         s
     }
@@ -185,11 +220,13 @@ impl<'tcx> Display for BasicBlocks<'tcx> {
 impl<'tcx> Display for BasicBlockData<'tcx>  {
     fn display(&self) -> String {
         let mut s = String::new();
-        s += &format!("UNWIND BLOCK: {}{}", self.is_cleanup, NEXT_LINE);
-        for stmt in self.statements.iter() {
-            s += &format!("{}{}", stmt.display(), NEXT_LINE);
+        if is_display_verbose() {
+            s += &format!("UNWIND BLOCK: {}{}", self.is_cleanup, NEXT_LINE);
+            for stmt in self.statements.iter() {
+                s += &format!("{}{}", stmt.display(), NEXT_LINE);
+            }
+            s += &format!("{}{}", self.terminator.clone().unwrap().display(), NEXT_LINE);
         }
-        s += &format!("{}{}", self.terminator.clone().unwrap().display(), NEXT_LINE);
         s
     }
 }
@@ -197,7 +234,9 @@ impl<'tcx> Display for BasicBlockData<'tcx>  {
 impl<'tcx> Display for Body<'tcx> {
     fn display(&self) -> String {
         let mut s = String::new();
-        s += &self.basic_blocks().display();
+        if is_display_verbose() {
+            s += &self.basic_blocks().display();
+        }
         s
     }
 }
