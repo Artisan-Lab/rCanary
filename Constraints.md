@@ -143,7 +143,7 @@ pub struct LocalDecl<'tcx> {
 pub enum StatementKind<'tcx> {
    /// Write the RHS Rvalue to the LHS Place.
    Assign(Box<(Place<'tcx>, Rvalue<'tcx>)>),
-
+g
    /// This represents all the reading that a pattern match may do
    /// (e.g., inspecting constants and discriminant values), and the
    /// kind of pattern it comes from. This is in order to adapt potential
@@ -377,7 +377,7 @@ Give three structs: `Foo` `Bar` `Baz`, and all of them contain a pointer (includ
 ```rust
 struct Foo<T> {
    ptr_mut: *mut T,
-   ptr_immut: *const T,
+   ptr_const: *const T,
 }
 
 struct Bar<T> {
