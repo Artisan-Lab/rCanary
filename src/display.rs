@@ -1,9 +1,8 @@
 use std::env;
-use std::ffi::OsString;
 
 use rustc_middle::mir::terminator::{Terminator, TerminatorKind};
-use rustc_middle::mir::{Operand, Rvalue, Statement, StatementKind, BasicBlock, BasicBlockData, Body};
-use rustc_middle::ty;
+use rustc_middle::mir::{Operand, Rvalue, Statement, StatementKind, BasicBlock, BasicBlockData, Body, LocalDecl, LocalDecls};
+use rustc_middle::ty::{self, TyKind};
 use rustc_index::vec::IndexVec;
 
 
@@ -17,6 +16,7 @@ pub trait Display {
 
 const NEXT_LINE:&str = "\n";
 const PADDING:&str = "    ";
+const EXPLAIN:&str = "  |:->|  ";
 
 #[derive(Debug, Copy, Clone, Hash)]
 pub enum MirDisplay {
@@ -50,7 +50,7 @@ impl<'tcx> Display for Terminator<'tcx> {
     fn display(&self) -> String {
         let mut s = String::new();
         if is_display_verbose() {
-            s += &format!("{}{}{:?}", self.kind.display(), PADDING, self.kind);
+            s += &format!("{}{:?}{}", PADDING, self.kind, self.kind.display());
         }
         s
     }
@@ -60,42 +60,42 @@ impl<'tcx> Display for TerminatorKind<'tcx>{
     fn display(&self) -> String {
         let mut s = String::new();
         if is_display_very_verbose() {
-            s += PADDING;
+            s += EXPLAIN;
             match self {
                 TerminatorKind::Goto { target:_ } =>
-                    s += "$$$$$ Goto",
+                    s += "Goto",
                 TerminatorKind::SwitchInt { discr:_, switch_ty:_, targets:_ } =>
-                    s += "$$$$$ SwitchInt",
+                    s += "SwitchInt",
                 TerminatorKind::Resume =>
-                    s += "$$$$$ Resume",
+                    s += "Resume",
                 TerminatorKind::Abort =>
-                    s += "$$$$$ Abort",
+                    s += "Abort",
                 TerminatorKind::Return =>
-                    s += "$$$$$ Return",
+                    s += "Return",
                 TerminatorKind::Unreachable =>
-                    s += "$$$$$ Unreachable",
+                    s += "Unreachable",
                 TerminatorKind::Drop { place:_, target:_, unwind:_ } =>
-                    s += "$$$$$ Drop",
+                    s += "Drop",
                 TerminatorKind::DropAndReplace { place:_, value:_, target:_, unwind:_ } =>
-                    s += "$$$$$ DropAndReplace",
+                    s += "DropAndReplace",
                 TerminatorKind::Assert { cond:_, expected:_, msg:_, target:_, cleanup:_ } =>
-                    s += "$$$$$ Assert",
+                    s += "Assert",
                 TerminatorKind::Yield { value:_, resume:_, resume_arg:_, drop:_ } =>
-                    s += "$$$$$ Yield",
+                    s += "Yield",
                 TerminatorKind::GeneratorDrop =>
-                    s += "$$$$$ GeneratorDrop",
+                    s += "GeneratorDrop",
                 TerminatorKind::FalseEdge { real_target:_, imaginary_target:_ } =>
-                    s += "$$$$$ FalseEdge",
+                    s += "FalseEdge",
                 TerminatorKind::FalseUnwind { real_target:_, unwind:_ } =>
-                    s += "$$$$$ FalseUnwind",
+                    s += "FalseUnwind",
                 TerminatorKind::InlineAsm { template:_, operands:_, options:_, line_spans:_, destination:_ } =>
-                    s += "$$$$$ InlineAsm",
+                    s += "InlineAsm",
                 TerminatorKind::Call { ref func, args:_, destination:_, cleanup:_, from_hir_call:_, fn_span:_ } => {
                     match func {
                         Operand::Constant(ref constant) => {
                                 match constant.literal.ty().kind() {
                                     ty::FnDef(ref id, _) =>
-                                        s += &format!("$$$$$ Call FnDef ID is {}", id.index.as_usize()).as_str(),
+                                        s += &format!("Call FnDef ID is {}", id.index.as_usize()).as_str(),
                                     _ => (),
                                 }
                         },
@@ -103,7 +103,6 @@ impl<'tcx> Display for TerminatorKind<'tcx>{
                     }
                 }
             };
-            s += NEXT_LINE;
         } else {
             ()
         };
@@ -115,7 +114,7 @@ impl<'tcx> Display for Statement<'tcx> {
     fn display(&self) -> String {
         let mut s = String::new();
         if is_display_verbose() {
-            s += &format!("{}{}{:?}", self.kind.display(), PADDING, self.kind);
+            s += &format!("{}{:?}{}", PADDING, self.kind, self.kind.display());
         }
         s
     }
@@ -125,34 +124,33 @@ impl<'tcx> Display for StatementKind<'tcx> {
     fn display(&self) -> String {
         let mut s = String::new();
         if is_display_very_verbose() {
-            s += PADDING;
+            s += EXPLAIN;
             match self {
                 StatementKind::Assign(ref assign) => {
-                    s += "@@@@@ Assign";
-                    s += &format!("    {:?} {}", assign.0, assign.1.display());
+                    s += "Assign";
+                    s += &format!("{}{:?} {}", EXPLAIN, assign.0, assign.1.display());
                 }
                 StatementKind::FakeRead(_) =>
-                    s += "@@@@@ FakeRead",
+                    s += "FakeRead",
                 StatementKind::SetDiscriminant { place: _, variant_index:_ } =>
-                    s += "@@@@@ SetDiscriminant",
+                    s += "SetDiscriminant",
                 StatementKind::StorageLive(_) =>
-                    s += "@@@@@ StorageLive",
+                    s += "StorageLive",
                 StatementKind::StorageDead(_) =>
-                    s += "@@@@@ StorageDead",
+                    s += "StorageDead",
                 StatementKind::LlvmInlineAsm(_) =>
-                    s += "@@@@@ LlvmInlineAsm",
+                    s += "LlvmInlineAsm",
                 StatementKind::Retag(_, _) =>
-                    s += "@@@@@ Retag",
+                    s += "Retag",
                 StatementKind::AscribeUserType(_, _) =>
-                    s += "@@@@@ AscribeUserType",
+                    s += "AscribeUserType",
                 StatementKind::Coverage(_) =>
-                    s += "@@@@@ Coverage",
+                    s += "Coverage",
                 StatementKind::CopyNonOverlapping(_) =>
-                    s += "@@@@@ CopyNonOverlapping",
+                    s += "CopyNonOverlapping",
                 StatementKind::Nop =>
-                    s += "@@@@@ Nop",
+                    s += "Nop",
             }
-            s += NEXT_LINE;
         } else {
             ()
         }
@@ -221,7 +219,7 @@ impl<'tcx> Display for BasicBlockData<'tcx>  {
     fn display(&self) -> String {
         let mut s = String::new();
         if is_display_verbose() {
-            s += &format!("UNWIND BLOCK: {}{}", self.is_cleanup, NEXT_LINE);
+            s += &format!("clean_up:{}{}{}", EXPLAIN, self.is_cleanup, NEXT_LINE);
             for stmt in self.statements.iter() {
                 s += &format!("{}{}", stmt.display(), NEXT_LINE);
             }
@@ -231,11 +229,49 @@ impl<'tcx> Display for BasicBlockData<'tcx>  {
     }
 }
 
+impl<'tcx> Display for LocalDecls<'tcx>  {
+    fn display(&self) -> String {
+        let mut s = String::new();
+        if is_display_verbose() {
+            let mut count = 0;
+            for ld in self.iter() {
+                s += &format!("_{}: {} {}", count, ld.display(), NEXT_LINE);
+                count = count + 1;
+            }
+        }
+        s
+    }
+}
+
+impl<'tcx> Display for LocalDecl<'tcx> {
+    fn display(&self) -> String {
+        let mut s = String::new();
+        if is_display_verbose() {
+            s += &format!("{:?}", self.ty);
+        }
+        if is_display_very_verbose() {
+            s += &format!("{}{}", EXPLAIN, self.ty.kind().display())
+        }
+        s
+    }
+}
+
 impl<'tcx> Display for Body<'tcx> {
     fn display(&self) -> String {
         let mut s = String::new();
         if is_display_verbose() {
+            s += &self.local_decls.display();
             s += &self.basic_blocks().display();
+        }
+        s
+    }
+}
+
+impl<'tcx> Display for TyKind<'tcx> {
+    fn display(&self) -> String {
+        let mut s = String::new();
+        if is_display_verbose() {
+            s += &format!("{:?}", self);
         }
         s
     }
