@@ -205,10 +205,8 @@ impl<'tcx> Display for BasicBlocks<'tcx> {
     fn display(&self) -> String {
         let mut s = String::new();
         if is_display_verbose() {
-            let mut count = 0;
-            for bb in self.iter() {
-                s += &format!("bb {} {{{}{}}}{}", count, NEXT_LINE, bb.display(), NEXT_LINE);
-                count = count + 1;
+            for (index, bb) in self.iter().enumerate() {
+                s += &format!("bb {} {{{}{}}}{}", index, NEXT_LINE, bb.display(), NEXT_LINE);
             }
         }
         s
@@ -233,10 +231,8 @@ impl<'tcx> Display for LocalDecls<'tcx>  {
     fn display(&self) -> String {
         let mut s = String::new();
         if is_display_verbose() {
-            let mut count = 0;
-            for ld in self.iter() {
-                s += &format!("_{}: {} {}", count, ld.display(), NEXT_LINE);
-                count = count + 1;
+            for (index, ld) in self.iter().enumerate() {
+                s += &format!("_{}: {} {}", index, ld.display(), NEXT_LINE);
             }
         }
         s
