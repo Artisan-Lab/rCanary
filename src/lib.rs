@@ -26,8 +26,9 @@ pub mod type_collector;
 pub static RLC_DEFAULT_ARGS: &[&str] =
     &["-Zalways-encode-mir", "-Zmir-opt-level=0", "--cfg=rlc"];
 pub static RLC_ROOT:&str = "/tmp/rlc";
-pub static RLC_LLVM_CACHE:&str = "/tmp/rlc/rlc-llvm-cache";
-pub static RLC_LLVM_IR:&str = "/tmp/rlc/rlc-llvm-ir";
+pub static RLC_LLVM_CACHE:&str = "/tmp/rlc/llvm-cache";
+pub static RLC_LLVM_IR:&str = "/tmp/rlc/llvm-ir";
+pub static RLC_LLVM_RES:&str = "/tmp/rlc/llvm-res";
 
 #[derive(Debug, Copy, Clone, Hash)]
 pub struct RlcConfig {
@@ -122,7 +123,5 @@ pub fn start_analyzer(tcx: TyCtxt, config: RlcConfig) {
         ||
                 TypeCollector::new(&rcx, config).start()
     );
-
-
 
 }
