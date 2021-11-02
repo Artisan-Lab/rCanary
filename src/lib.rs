@@ -13,13 +13,13 @@ use crate::grain::RlcGrain;
 use crate::log::Verbosity;
 use crate::context::RlcGlobalCtxt;
 use crate::display::MirDisplay;
-use crate::type_collector::TypeCollector;
+use crate::type_discernment::TypeDiscernment;
 
 pub mod grain;
 pub mod log;
 pub mod context;
 pub mod display;
-pub mod type_collector;
+pub mod type_discernment;
 
 // Insert rustc arguments at the beginning of the argument list that RLC wants to be
 // set per default, for maximal validation power.
@@ -119,9 +119,9 @@ pub fn start_analyzer(tcx: TyCtxt, config: RlcConfig) {
     let rcx = &*Box::leak(rcx_boxed);
 
     run_analyzer(
-        "Type Collector",
+        "Type Discernment",
         ||
-                TypeCollector::new(&rcx, config).start()
+                TypeDiscernment::new(&rcx).start()
     );
 
 }
