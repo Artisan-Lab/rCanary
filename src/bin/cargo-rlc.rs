@@ -390,8 +390,6 @@ fn phase_llvm_ir() {
 
     llvm_ir_emitter();
 
-    let mut cmd = Command::new("rlc_phase_llvm");
-
     if fs::read_dir(RLC_LLVM_IR).is_ok() {
         for entry in WalkDir::new(RLC_LLVM_IR) {
             let path = entry.unwrap().into_path();
@@ -404,16 +402,15 @@ fn phase_llvm_ir() {
                 .ends_with(".ll") {
                 continue;
             }
-            println!("{:?}", path);
+            let mut cmd = Command::new("rlc_phase_llvm");
+            rlc_info!("{:?}", path);
             cmd.arg(path);
-            break;
+            if let Err(e) = cmd.status() {
+                rlc_error_and_exit(format!("RLC-PHASE-LLVM Loaded Failed {}", e));
+            }
         }
     } else {
         rlc_error_and_exit("Failed to find RLC_LLVM_IR");
-    }
-
-    if let Err(e) = cmd.status() {
-        rlc_error_and_exit(format!("RLC-PHASE-LLVM Loaded Failed {}", e));
     }
 
     rlc_info!("Phase-LLVM-IR has been done");
