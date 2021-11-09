@@ -19,6 +19,7 @@
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/ManagedStatic.h>
 #include <llvm/Support/CommandLine.h>
+#include <llvm/Support/FileSystem.h>
 #include "test.h"
 
 using namespace llvm;
@@ -58,16 +59,42 @@ void visit_call_graph(
     visit.insert(name);
 }
 
-// This function will write the final call graph that we interested (will incur memory deallocation)
-void emit_call_graph(
+// This function will print the final call graph that we interested (those functions would incur memory deallocation)
+void print_call_graph(
         const std::string &name,
         std::unordered_map<std::string, std::unordered_set<std::string>> &map
 )
 {
     for (auto &f: map[name]) {
-        outs() << "     " << f << '\n';
-        emit_call_graph(f, map);
+        outs().changeColor(raw_ostream::BLUE) << "     " << f << '\n';
+        print_call_graph(f, map);
     }
+}
+
+void emit_call_graph(
+        std::unordered_map<std::string, std::unordered_set<std::string>> &map,
+        std::string file_name
+)
+{
+    for (int i = 0 ; i < 3 ; ++i) {
+        file_name.pop_back();
+    }
+    file_name.append(".rlc");
+
+    raw_ostream *out = &outs();
+    std::error_code EC;
+    out = new raw_fd_ostream(file_name, EC, sys::fs::CD_CreateAlways);
+
+    for (auto &f : map) {
+        out->write(f.first.c_str(), f.first.size());
+        out->write('\n');
+        for (auto &callee : f.second) {
+            out->write("     ", 5);
+            out->write(callee.c_str(), callee.size());
+            out->write('\n');
+        }
+    }
+    out->flush();
 }
 
 // The input of this binary is the path (dir) to the llvm-ir file we emitted in first phase
@@ -207,7 +234,9 @@ int main(int argc, char **argv) {
 
     for (auto &t : taint) {
         path.clear();
-        outs() << "taint: "<< t << '\n';
-        emit_call_graph(t, f_map);
+        outs().changeColor(raw_ostream::RED, true) << "taint: "<< t << '\n';
+        print_call_graph(t, f_map);
     }
+
+    emit_call_graph(f_map, argv[1]);
 }
