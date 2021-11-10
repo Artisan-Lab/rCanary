@@ -28,9 +28,6 @@ impl<'tcx> TypeDiscernment<'tcx> {
             }
         }
 
-        println!("{:?}", self.type_map.ty_to_string);
-
-
     }
 }
 
@@ -138,10 +135,8 @@ impl<'tcx> Visitor<'tcx> for TypeDiscernment<'tcx> {
 
 }
 
-
 fn mir_body<'tcx>(tcx: TyCtxt<'tcx>, def_id: DefId) -> &'tcx Body<'tcx> {
     let id = ty::WithOptConstParam::unknown(def_id);
     let def = ty::InstanceDef::Item(id);
     tcx.instance_mir(def)
 }
-
