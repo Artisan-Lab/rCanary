@@ -7,7 +7,6 @@ use std::path::{PathBuf, Path};
 use std::time::Duration;
 use std::fmt::{Display, Formatter};
 use std::process;
-use std::fs;
 
 use wait_timeout::ChildExt;
 use walkdir::WalkDir;
@@ -16,6 +15,7 @@ use rlc::log::{Verbosity, rlc_error_and_exit};
 use rlc::RlcPhase;
 use rlc::{rlc_info};
 use rlc::{RLC_DEFAULT_ARGS, RLC_ROOT, RLC_LLVM_CACHE, RLC_LLVM_IR};
+use rlc::fs::{rlc_create_dir, rlc_remove_dir, rlc_copy_file, rlc_can_read_dir};
 
 use rustc_version::VersionMeta;
 
@@ -258,34 +258,14 @@ fn run_cmd(mut cmd: Command, phase: RlcPhase) {
     }
 }
 
-fn rlc_create_dir<P: AsRef<Path>>(path: P, msg: impl AsRef<str>) {
-    if fs::read_dir(&path).is_err() {
-        fs::create_dir(path)
-            .unwrap_or_else(|_|
-                rlc_error_and_exit(msg)
-            );
-    }
-}
-
-fn rlc_remove_dir<P: AsRef<Path>>(path: P, msg: impl AsRef<str>) {
-    if fs::read_dir(&path).is_ok() {
-        fs::remove_dir_all(path)
-            .unwrap_or_else(|_|
-                rlc_error_and_exit(msg)
-            );
-    }
-}
 
 fn rlc_add_env(cmd: &mut Command) {
     if has_rlc_arg_flag("-MIR=V") {
         cmd.env("MIR_DISPLAY", "VERBOSE");
-        //println!("1");
     }
     if has_rlc_arg_flag("-MIR=VV") {
         cmd.env("MIR_DISPLAY", "VERY VERBOSE");
-        //println!("2");
     }
-    //println!("3");
 }
 
 fn phase_preprocess() {
@@ -372,17 +352,14 @@ fn llvm_ir_emitter() {
                         )
                     );
 
-                fs::copy(&entry_path, &dest_path)
-                    .unwrap_or_else(|e|
-                        rlc_error_and_exit(format!("Failed to copy llvm ir file {}",e) )
-                    );
+                rlc_copy_file(&entry_path, &dest_path, "Failed to copy LLVM IR file");
 
                 rlc_info!("Successful to emit LLVM-IR file and transform to: {:?}", dest_path);
             }
         }
 
-        fs::remove_dir_all(RLC_LLVM_CACHE)
-            .unwrap_or_else(|e| rlc_error_and_exit(format!("Failed to remove RLC_LLVM_Cache {}", e)));
+        rlc_remove_dir(RLC_LLVM_CACHE, "Failed to remove RLC_LLVM_Cache");
+
     }
     rlc_info!("Ready for RLC Phase II-SubPhase: LLVM-IR-Emitter");
 }
@@ -392,7 +369,7 @@ fn phase_llvm_ir() {
 
     llvm_ir_emitter();
 
-    if fs::read_dir(RLC_LLVM_IR).is_ok() {
+    if rlc_can_read_dir(RLC_LLVM_IR, "Cannot read LLVM IR files") {
         for entry in WalkDir::new(RLC_LLVM_IR) {
             let path = entry.unwrap().into_path();
             if !path

@@ -16,10 +16,11 @@ use crate::context::RlcGlobalCtxt;
 use crate::display::MirDisplay;
 use crate::type_discernment::TypeDiscernment;
 
-pub mod grain;
-pub mod log;
 pub mod context;
 pub mod display;
+pub mod fs;
+pub mod grain;
+pub mod log;
 pub mod type_discernment;
 
 // Insert rustc arguments at the beginning of the argument list that RLC wants to be
