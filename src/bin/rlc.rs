@@ -1,5 +1,6 @@
 #![feature(rustc_private)]
 #![feature(backtrace)]
+#![cfg_attr(debug_assertions, allow(dead_code, unused_imports, unused_variables, unused_mut, dead_code))]
 
 extern crate rustc_driver;
 extern crate rustc_interface;
@@ -143,7 +144,9 @@ fn run_complier(rlc_args: &mut RlcArgs) -> i32 {
     let run_compiler = rustc_driver::RunCompiler::new(&rlc_args.args, &mut rlc_args.rlc_cc);
     let exit_code = rustc_driver::catch_with_exit_code(move || run_compiler.run());
 
-    rlc_info!("The arg for compilation is {:?}", rlc_final_args);
+    if option_env!("RLC_VERBOSE").is_some() {
+        rlc_info!("The arg for compilation is {:?}", rlc_final_args);
+    }
 
     exit_code
 }
