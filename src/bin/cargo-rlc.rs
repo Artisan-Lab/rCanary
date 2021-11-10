@@ -229,12 +229,14 @@ fn is_identified_target(
     match TargetKind::from(target) {
         TargetKind::Library => {
             cmd.arg("--lib");
+            cmd.env("RLC_LIB", "");
             clean_package(&package.name);
             true
         },
         TargetKind::Bin => {
             cmd.arg("--bin")
                 .arg(&target.name);
+            cmd.env("RLC_BIN", &target.name);
             true
         },
         TargetKind::Unspecified => {
@@ -312,7 +314,7 @@ fn llvm_ir_emitter() {
             .arg("--emit=llvm-ir")
             .args(RLC_DEFAULT_ARGS);
 
-        if has_arg_flag("-v") {
+        if has_arg_flag("-v") || has_arg_flag("-vv") {
             rlc_info!("Command is: {:?}", cmd);
         }
 
