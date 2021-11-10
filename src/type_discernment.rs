@@ -124,23 +124,3 @@ impl<'tcx> TypeMap<'tcx> {
         self.ty_to_string.remove(&ty);
     }
 }
-
-
-
-
-// An implementation for ItemLikeVisitor in HIR
-// impl<'tcx> ItemLikeVisitor<'tcx> for TypeCollector<'tcx> {
-//     fn visit_item(&mut self, item: &'tcx rustc_hir::Item<'tcx>) {
-//         //rlc_info!("{:?}", item);
-//     }
-//
-//     fn visit_trait_item(&mut self, _trait_item: &'tcx rustc_hir::TraitItem<'tcx>) {
-//     }
-//
-//     fn visit_impl_item(&mut self, _impl_item: &'tcx rustc_hir::ImplItem<'tcx>) {
-//     }
-//
-//     fn visit_foreign_item(&mut self, foreign_item: &'tcx rustc_hir::ForeignItem<'tcx>) {
-//         rlc_info!("{:?}", foreign_item);
-//     }
-// }
