@@ -143,7 +143,7 @@ pub struct LocalDecl<'tcx> {
 pub enum StatementKind<'tcx> {
    /// Write the RHS Rvalue to the LHS Place.
    Assign(Box<(Place<'tcx>, Rvalue<'tcx>)>),
-g
+
    /// This represents all the reading that a pattern match may do
    /// (e.g., inspecting constants and discriminant values), and the
    /// kind of pattern it comes from. This is in order to adapt potential
