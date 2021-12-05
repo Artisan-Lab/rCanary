@@ -1,9 +1,9 @@
 #![feature(rustc_private)]
 #![feature(backtrace)]
+#![feature(control_flow_enum)]
 #![cfg_attr(debug_assertions, allow(dead_code, unused_imports, unused_variables, unused_mut, dead_code))]
 
 extern crate rustc_middle;
-extern crate rustc_data_structures;
 extern crate rustc_hir;
 extern crate rustc_span;
 extern crate rustc_index;
@@ -14,14 +14,14 @@ use crate::grain::RlcGrain;
 use crate::log::Verbosity;
 use crate::context::RlcGlobalCtxt;
 use crate::display::MirDisplay;
-use crate::type_discernment::TypeDiscernment;
+use crate::analysis::type_analysis;
 
 pub mod context;
 pub mod display;
 pub mod fs;
 pub mod grain;
 pub mod log;
-pub mod type_discernment;
+pub mod analysis;
 
 // Insert rustc arguments at the beginning of the argument list that RLC wants to be
 // set per default, for maximal validation power.
@@ -121,9 +121,9 @@ pub fn start_analyzer(tcx: TyCtxt, config: RlcConfig) {
     let rcx = &*Box::leak(rcx_boxed);
 
     run_analyzer(
-        "Type Discernment",
+        "Type Analysis",
         ||
-                TypeDiscernment::new(&rcx).start()
+                type_analysis::TypeAnalysis::new(&rcx).start()
     );
 
 }

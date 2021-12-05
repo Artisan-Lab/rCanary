@@ -2,6 +2,7 @@ use rustc_middle::ty::TyCtxt;
 
 use crate::RlcConfig;
 
+#[derive(Clone)]
 pub struct RlcGlobalCtxt<'tcx> {
     tcx: TyCtxt<'tcx>,
     config: RlcConfig,

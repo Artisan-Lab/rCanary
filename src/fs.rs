@@ -1,6 +1,9 @@
 use crate::log::rlc_error_and_exit;
 
+use rustc_demangle::try_demangle;
+
 use std::fs;
+use std::fmt::format;
 use std::path::Path;
 
 pub fn rlc_create_dir<P: AsRef<Path>>(path: P, msg: impl AsRef<str>) {
@@ -39,5 +42,12 @@ pub fn rlc_read<P: AsRef<Path>>(path: P, msg: impl AsRef<str>) -> fs::File {
     match fs::File::open(path) {
         Ok(file) => file,
         Err(e) => rlc_error_and_exit(format!("{}: {}", msg.as_ref(), e)),
+    }
+}
+
+pub fn rlc_demangle(name: &str) -> String {
+    match try_demangle(name) {
+        Ok(d) => format!("{:#}", d),
+        Err(e) => name.to_string(),
     }
 }
