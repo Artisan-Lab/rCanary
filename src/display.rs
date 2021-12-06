@@ -61,10 +61,10 @@ impl<'tcx> Display for TerminatorKind<'tcx>{
         let mut s = String::new();
         if is_display_very_verbose() {
             s += EXPLAIN;
-            match self {
-                TerminatorKind::Goto { target:_ } =>
+            match &self {
+                TerminatorKind::Goto { .. } =>
                     s += "Goto",
-                TerminatorKind::SwitchInt { discr:_, switch_ty:_, targets:_ } =>
+                TerminatorKind::SwitchInt { .. } =>
                     s += "SwitchInt",
                 TerminatorKind::Resume =>
                     s += "Resume",
@@ -74,27 +74,27 @@ impl<'tcx> Display for TerminatorKind<'tcx>{
                     s += "Return",
                 TerminatorKind::Unreachable =>
                     s += "Unreachable",
-                TerminatorKind::Drop { place:_, target:_, unwind:_ } =>
+                TerminatorKind::Drop { .. } =>
                     s += "Drop",
-                TerminatorKind::DropAndReplace { place:_, value:_, target:_, unwind:_ } =>
+                TerminatorKind::DropAndReplace { .. } =>
                     s += "DropAndReplace",
-                TerminatorKind::Assert { cond:_, expected:_, msg:_, target:_, cleanup:_ } =>
+                TerminatorKind::Assert { .. } =>
                     s += "Assert",
-                TerminatorKind::Yield { value:_, resume:_, resume_arg:_, drop:_ } =>
+                TerminatorKind::Yield { .. } =>
                     s += "Yield",
                 TerminatorKind::GeneratorDrop =>
                     s += "GeneratorDrop",
-                TerminatorKind::FalseEdge { real_target:_, imaginary_target:_ } =>
+                TerminatorKind::FalseEdge { .. } =>
                     s += "FalseEdge",
-                TerminatorKind::FalseUnwind { real_target:_, unwind:_ } =>
+                TerminatorKind::FalseUnwind { .. } =>
                     s += "FalseUnwind",
-                TerminatorKind::InlineAsm { template:_, operands:_, options:_, line_spans:_, destination:_ } =>
+                TerminatorKind::InlineAsm { .. } =>
                     s += "InlineAsm",
-                TerminatorKind::Call { ref func, args:_, destination:_, cleanup:_, from_hir_call:_, fn_span:_ } => {
+                TerminatorKind::Call { func, .. } => {
                     match func {
-                        Operand::Constant(ref constant) => {
+                        Operand::Constant(constant) => {
                                 match constant.literal.ty().kind() {
-                                    ty::FnDef(ref id, _) =>
+                                    ty::FnDef(id, ..) =>
                                         s += &format!("Call FnDef ID is {}", id.index.as_usize()).as_str(),
                                     _ => (),
                                 }
@@ -125,28 +125,28 @@ impl<'tcx> Display for StatementKind<'tcx> {
         let mut s = String::new();
         if is_display_very_verbose() {
             s += EXPLAIN;
-            match self {
-                StatementKind::Assign(ref assign) => {
+            match &self {
+                StatementKind::Assign(assign) => {
                     s += "Assign";
                     s += &format!("{}{:?} {}", EXPLAIN, assign.0, assign.1.display());
                 }
-                StatementKind::FakeRead(_) =>
+                StatementKind::FakeRead( .. ) =>
                     s += "FakeRead",
-                StatementKind::SetDiscriminant { place: _, variant_index:_ } =>
+                StatementKind::SetDiscriminant { .. } =>
                     s += "SetDiscriminant",
-                StatementKind::StorageLive(_) =>
+                StatementKind::StorageLive( .. ) =>
                     s += "StorageLive",
-                StatementKind::StorageDead(_) =>
+                StatementKind::StorageDead( .. ) =>
                     s += "StorageDead",
-                StatementKind::LlvmInlineAsm(_) =>
+                StatementKind::LlvmInlineAsm( .. ) =>
                     s += "LlvmInlineAsm",
-                StatementKind::Retag(_, _) =>
+                StatementKind::Retag( .. ) =>
                     s += "Retag",
-                StatementKind::AscribeUserType(_, _) =>
+                StatementKind::AscribeUserType( .. ) =>
                     s += "AscribeUserType",
-                StatementKind::Coverage(_) =>
+                StatementKind::Coverage( .. ) =>
                     s += "Coverage",
-                StatementKind::CopyNonOverlapping(_) =>
+                StatementKind::CopyNonOverlapping( .. ) =>
                     s += "CopyNonOverlapping",
                 StatementKind::Nop =>
                     s += "Nop",
@@ -163,33 +163,33 @@ impl<'tcx> Display for Rvalue<'tcx> {
         let mut s = String::new();
         if is_display_very_verbose() {
             match self {
-                Rvalue::Use(_) =>
+                Rvalue::Use( .. ) =>
                     s += "Rvalue Use",
-                Rvalue::Repeat(_, _) =>
+                Rvalue::Repeat( .. ) =>
                     s += "Rvalue Repeat",
-                Rvalue::Ref(_, _, _) =>
+                Rvalue::Ref( .. ) =>
                     s += "Rvalue Ref",
-                Rvalue::ThreadLocalRef(_) =>
+                Rvalue::ThreadLocalRef( .. ) =>
                     s += "Rvalue ThreadLocalRef",
-                Rvalue::AddressOf(_, _) =>
+                Rvalue::AddressOf( .. ) =>
                     s += "Rvalue AddressOf",
-                Rvalue::Len(_) =>
+                Rvalue::Len( .. ) =>
                     s += "Rvalue Len",
-                Rvalue::Cast(_, _, _) =>
+                Rvalue::Cast( .. ) =>
                     s += "Rvalue Cast",
-                Rvalue::BinaryOp(_, _) =>
+                Rvalue::BinaryOp( .. ) =>
                     s += "Rvalue BinaryOp",
-                Rvalue::CheckedBinaryOp(_, _) =>
+                Rvalue::CheckedBinaryOp( .. ) =>
                     s += "Rvalue CheckedBinaryOp",
-                Rvalue::NullaryOp(_, _) =>
+                Rvalue::NullaryOp( .. ) =>
                     s += "Rvalue NullaryOp",
-                Rvalue::UnaryOp(_, _) =>
+                Rvalue::UnaryOp( .. ) =>
                     s += "Rvalue UnaryOp",
-                Rvalue::Discriminant(_) =>
+                Rvalue::Discriminant( .. ) =>
                     s += "Rvalue Discriminant",
-                Rvalue::Aggregate(_, _) =>
+                Rvalue::Aggregate( .. ) =>
                     s += "Rvalue Aggregate",
-                Rvalue::ShallowInitBox(_, _) =>
+                Rvalue::ShallowInitBox( .. ) =>
                     s+= "Rvalue ShallowInitBox",
             }
         } else {

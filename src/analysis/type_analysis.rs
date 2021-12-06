@@ -3,7 +3,6 @@ use rustc_middle::ty::{Ty, TyCtxt};
 use rustc_span::def_id::DefId;
 
 use crate::context::RlcCtxt;
-use crate::{rlc_info};
 use crate::type_analysis::ownership::RawTypeOwner;
 
 pub mod init;
@@ -16,10 +15,10 @@ type AdtOwner = HashMap<DefId, (RawTypeOwner, Vec<bool>)>;
 type Parameters = HashSet<usize>;
 type Unique = HashSet<DefId>;
 
-// Type Discernment is the first phase for ATC Analysis and it will perform a simple-inter-procedural analysis
-// for current crate that can grasp all types after monomorphism of generics.
-// The struct TypeCollector impls mir::Visitor to perform this analysis to construct all dependency of types.
-// Note: the type in this phase is Ty::ty instead of Hir::ty.
+// Type Analysis is the first step and it will perform a simple-inter-procedural analysis
+// for current crate and collect types after monomorphism as well as extracting 'adt-def'.
+// The struct TypeAnalysis implements mir::Visitor to simulate as the type collector.
+// Note: the type in this phase is Ty::ty rather of Hir::ty.
 #[derive(Clone)]
 pub struct TypeAnalysis<'tcx> {
     rcx: RlcCtxt<'tcx>,
@@ -75,19 +74,14 @@ impl<'tcx> TypeAnalysis<'tcx> {
     // The main phase and the starter function of Type Collector.
     // RLC will construct an instance of struct TypeCollector and call self.start to make analysis starting.
     pub fn start(&mut self) {
-
         // Get the analysis result from rlc phase llvm
         self.init();
         // Get related adt types through visiting mir local
         self.visitor();
         // Solving types by local ty and rlc llvm result
         self.solver();
-
     }
 }
-
-#[derive(Copy, Clone, Hash, Debug)]
-struct FoundParam;
 
 #[derive(Clone)]
 struct RawGeneric<'tcx> {
@@ -170,20 +164,24 @@ impl<'tcx, 'a> RawGenericPropagation<'tcx, 'a> {
 #[derive(Clone)]
 struct OwnerPropagation<'tcx, 'a> {
     tcx: TyCtxt<'tcx>,
+    ownership: RawTypeOwner,
     unique: Unique,
     ref_adt_owner: &'a AdtOwner,
 }
 
 impl<'tcx, 'a> OwnerPropagation<'tcx, 'a> {
-    pub fn new(tcx: TyCtxt<'tcx>, ref_adt_owner: &'a AdtOwner) -> Self {
+    pub fn new(tcx: TyCtxt<'tcx>, ownership: RawTypeOwner, ref_adt_owner: &'a AdtOwner) -> Self {
         Self {
             tcx,
+            ownership,
             unique: HashSet::new(),
             ref_adt_owner,
         }
     }
 
     pub fn tcx(&self) -> TyCtxt<'tcx> { self.tcx }
+
+    pub fn ownership(&self) -> RawTypeOwner { self.ownership }
 
     pub fn unique(&self) -> &Unique { &self.unique }
 

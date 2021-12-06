@@ -1,5 +1,4 @@
 use super::TypeAnalysis;
-use crate::log::rlc_error_and_exit;
 use crate::RLC_LLVM_IR;
 use crate::fs::{rlc_can_read_dir, rlc_read, rlc_demangle};
 
@@ -25,7 +24,7 @@ impl<'tcx> TypeAnalysis<'tcx> {
                     .ends_with(".rlc")
                 {
                     let file = rlc_read(entry_path,"Failed to read file");
-                    let mut fin = BufReader::new(file);
+                    let fin = BufReader::new(file);
 
                     let mut caller = String::new();
                     for line in fin.lines() {
@@ -44,9 +43,6 @@ impl<'tcx> TypeAnalysis<'tcx> {
                     }
 
                 }
-            }
-            for elem in call_graph {
-                // println!("{}",elem.0);
             }
         }
     }
