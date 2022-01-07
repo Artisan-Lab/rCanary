@@ -1,13 +1,31 @@
 use super::TypeAnalysis;
 use crate::RLC_LLVM_IR;
-use crate::fs::{rlc_can_read_dir, rlc_read, rlc_demangle};
+use crate::fs::{rlc_can_read_dir, rlc_read, rlc_demangle, rlc_create_file};
 
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Write};
 use std::collections::{HashMap, HashSet};
 
+use serde_json::json;
 use walkdir::WalkDir;
 
-type CallGraph = HashMap<String, HashSet<String>>;
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CallGraph {
+    g: Graph,
+}
+
+type Graph = HashMap<String, HashSet<String>>;
+
+impl Default for CallGraph {
+    fn default() -> Self {
+        Self { g: HashMap::default() }
+    }
+}
+
+impl CallGraph {
+    pub fn graph(&self) -> &Graph { &self.g }
+
+    pub fn graph_mut(&mut self) -> &mut Graph { &mut self.g }
+}
 
 impl<'tcx> TypeAnalysis<'tcx> {
     pub fn init(&mut self) {
@@ -32,10 +50,12 @@ impl<'tcx> TypeAnalysis<'tcx> {
                         if !s.starts_with("     ") {
                             caller = s;
                             call_graph
+                                .graph_mut()
                                 .insert(rlc_demangle(&caller), HashSet::new());
                         } else {
                             let callee = s.replace("     ", "");
                             call_graph
+                                .graph_mut()
                                 .get_mut(&rlc_demangle(&caller))
                                 .unwrap()
                                 .insert(rlc_demangle(&callee));
@@ -44,6 +64,9 @@ impl<'tcx> TypeAnalysis<'tcx> {
 
                 }
             }
+            let json_value = json!(call_graph);
+            let mut file = rlc_create_file("/tmp/rlc/cg.json", "failed to create call graph (json)");
+            file.write(json_value.to_string().as_bytes());
         }
     }
 }
