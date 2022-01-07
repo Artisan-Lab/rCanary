@@ -1,12 +1,17 @@
 #![feature(rustc_private)]
 #![feature(backtrace)]
 #![feature(control_flow_enum)]
-#![cfg_attr(debug_assertions, allow(dead_code, unused_imports, unused_variables, unused_mut, dead_code))]
+#![cfg_attr(debug_assertions, allow(dead_code, unused_imports, unused_variables, unused_mut, dead_code, unused_must_use))]
 
 extern crate rustc_middle;
 extern crate rustc_hir;
 extern crate rustc_span;
 extern crate rustc_index;
+extern crate serde;
+extern crate serde_json;
+
+#[macro_use]
+extern crate serde_derive;
 
 use rustc_middle::ty::TyCtxt;
 
