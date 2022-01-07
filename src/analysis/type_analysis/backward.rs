@@ -1,7 +1,7 @@
 use super::TypeAnalysis;
 
 impl<'tcx> TypeAnalysis<'tcx> {
-    pub fn solver(&mut self) {
+    pub fn backward(&mut self) {
 
     }
 }

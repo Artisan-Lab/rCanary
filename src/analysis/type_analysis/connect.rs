@@ -28,7 +28,7 @@ impl CallGraph {
 }
 
 impl<'tcx> TypeAnalysis<'tcx> {
-    pub fn init(&mut self) {
+    pub fn connect(&mut self) {
         if rlc_can_read_dir(RLC_LLVM_IR, "Cannot read LLVM IR files") {
             let mut call_graph = CallGraph::default();
             for entry in WalkDir::new(RLC_LLVM_IR) {

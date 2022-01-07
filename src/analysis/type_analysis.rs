@@ -6,9 +6,9 @@ use rustc_span::def_id::DefId;
 use crate::context::RlcCtxt;
 use crate::type_analysis::ownership::RawTypeOwner;
 
-pub mod init;
+pub mod connect;
 pub mod visitor;
-pub mod solver;
+pub mod backward;
 pub mod ownership;
 
 type TyMap<'tcx> = HashMap<Ty<'tcx>, String>;
@@ -77,11 +77,11 @@ impl<'tcx> TypeAnalysis<'tcx> {
     // RLC will construct an instance of struct TypeCollector and call self.start to make analysis starting.
     pub fn start(&mut self) {
         // Get the analysis result from rlc phase llvm
-        self.init();
+        self.connect();
         // Get related adt types through visiting mir local
         self.visitor();
         // Solving types by local ty and rlc llvm result
-        self.solver();
+        self.backward();
     }
 }
 
