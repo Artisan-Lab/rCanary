@@ -11,9 +11,10 @@ pub mod solver;
 pub mod ownership;
 
 type TyMap<'tcx> = HashMap<Ty<'tcx>, String>;
-type AdtOwner = HashMap<DefId, (RawTypeOwner, Vec<bool>)>;
+type OwnerUnit = (RawTypeOwner, Vec<bool>);
+type AdtOwner = HashMap<DefId, Vec<OwnerUnit>>;
 type Parameters = HashSet<usize>;
-type Unique = HashSet<DefId>;
+pub type Unique = HashSet<DefId>;
 
 // Type Analysis is the first step and it will perform a simple-inter-procedural analysis
 // for current crate and collect types after monomorphism as well as extracting 'adt-def'.
@@ -134,15 +135,17 @@ struct RawGenericPropagation<'tcx, 'a> {
     tcx: TyCtxt<'tcx>,
     record: Vec<bool>,
     unique: Unique,
+    source_enum: bool,
     ref_adt_owner: &'a AdtOwner,
 }
 
 impl<'tcx, 'a> RawGenericPropagation<'tcx, 'a> {
-    pub fn new(tcx: TyCtxt<'tcx>, record: Vec<bool>, ref_adt_owner: &'a AdtOwner) -> Self {
+    pub fn new(tcx: TyCtxt<'tcx>, record: Vec<bool>, source_enum: bool, ref_adt_owner: &'a AdtOwner) -> Self {
         Self {
             tcx,
             record,
             unique: HashSet::new(),
+            source_enum,
             ref_adt_owner,
         }
     }
@@ -156,6 +159,8 @@ impl<'tcx, 'a> RawGenericPropagation<'tcx, 'a> {
     pub fn unique(&self) -> &Unique { &self.unique }
 
     pub fn unique_mut(&mut self) -> &mut Unique { &mut self.unique }
+
+    pub fn source_enum(&mut self) -> bool { self.source_enum }
 
     pub fn owner(&self) -> &'a AdtOwner { self.ref_adt_owner }
 

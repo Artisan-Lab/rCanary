@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use rustc_middle::ty::Ty;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub enum    RawTypeOwner {
+pub enum RawTypeOwner {
     Owned,
     Unowned,
     Uninit,

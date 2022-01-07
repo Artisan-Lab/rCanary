@@ -7,7 +7,6 @@ use rustc_span::def_id::DefId;
 
 use std::collections::HashMap;
 use std::ops::ControlFlow;
-use std::rc::Rc;
 
 use crate::display::{self, Display};
 use crate::type_analysis::{TypeAnalysis, OwnerPropagation, RawGeneric, RawGenericFieldSubst, RawGenericPropagation, RawTypeOwner};
@@ -21,6 +20,7 @@ pub(crate) fn mir_body<'tcx>(tcx: TyCtxt<'tcx>, def_id: DefId) -> &'tcx Body<'tc
 
 // This function is aiming at resolving problems due to 'TyContext' not implementing 'Clone' trait,
 // thus we call function 'copy_ty_context' to simulate 'self.clone()'.
+#[inline(always)]
 pub(crate) fn copy_ty_context(tc: &TyContext) -> TyContext {
     match tc {
         TyContext::LocalDecl { local, source_info } => {
@@ -48,6 +48,16 @@ impl<'tcx> TypeAnalysis<'tcx> {
     //
     // Those 2 parts can accelerate heap-ownership inference in the data-flow analysis.
     pub fn visitor(&mut self) {
+
+        #[inline(always)]
+        fn start_channel<M>(mut method: M, v_did: &Vec<DefId>)
+            where M: FnMut(DefId) -> (),
+        {
+            for did in v_did {
+                method(*did);
+            }
+        }
+
         // Get the Global TyCtxt from rustc
         // Grasp all mir Keys defined in current crate
         let tcx = self.tcx();
@@ -66,31 +76,19 @@ impl<'tcx> TypeAnalysis<'tcx> {
             }
         }
 
-        let dids:Vec<DefId> = self.adt_recorder.iter().map(|did| *did).collect();
+        let dids: Vec<DefId> = self.adt_recorder.iter().map(|did| *did).collect();
 
-        for did in &dids {
-            self.extract_raw_generic(*did);
-        }
+        start_channel(|did| self.extract_raw_generic(did), &dids);
+        start_channel(|did| self.extract_raw_generic_prop(did), &dids);
+        start_channel(|did| self.extract_phantom_unit(did), &dids);
+        start_channel(|did| self.extract_owner_prop(did), &dids);
 
-        for did in &dids {
-            self.extract_raw_generic_prop(*did);
-        }
-
-        for did in &dids {
-            self.extract_phantom_unit(*did);
-        }
-
-        for did in &dids {
-            self.extract_owner_prop(*did);
-        }
-
-        for elem in &self.adt_owner {
-            println!("{:?} {:?}", self.tcx().type_of(*elem.0), elem.1);
-            if elem.1.0 != RawTypeOwner::Unowned {
-                println!("{:?} {:?}", self.tcx().type_of(*elem.0), elem.1);
-            }
-        }
-
+        // for elem in &self.adt_owner {
+        //     println!("{:?} {:?}", self.tcx().type_of(*elem.0), elem.1);
+        //     if elem.1.0 != RawTypeOwner::Unowned {
+        //         println!("{:?} {:?}", self.tcx().type_of(*elem.0), elem.1);
+        //     }
+        // }
     }
 
     // Extract params in adt types, the 'param' means one generic parameter acting like 'T', 'A', etc...
@@ -109,6 +107,7 @@ impl<'tcx> TypeAnalysis<'tcx> {
     // }
     //
     // the final result for <A, B, T, S> is <true, true, false, true>.
+    #[inline(always)]
     fn extract_raw_generic(&mut self, did: DefId) {
 
         // Get the definition and subset reference from adt did
@@ -118,19 +117,20 @@ impl<'tcx> TypeAnalysis<'tcx> {
             _ => unreachable!(),
         };
 
-        if adt_def.is_struct() {
+        let mut v_res = Vec::new();
 
+        for variant in adt_def.variants.iter() {
             let mut raw_generic = RawGeneric::new(self.tcx(), substs.len());
 
-            for field in adt_def.all_fields() {
+            for field in &variant.fields {
                 let field_ty = field.ty(self.tcx(), substs);
                 field_ty.visit_with(&mut raw_generic);
             }
-
-            let res:(RawTypeOwner, Vec<bool>) = (RawTypeOwner::Unowned, raw_generic.record.clone());
-
-            self.adt_owner_mut().insert(did, res);
+            v_res.push((RawTypeOwner::Unowned, raw_generic.record_mut().clone()));
         }
+
+        self.adt_owner_mut().insert(did, v_res);
+
     }
 
     // Extract all params in the adt types like param 'T' and then propagate from the bottom to top.
@@ -161,6 +161,7 @@ impl<'tcx> TypeAnalysis<'tcx> {
     // }
     //
     // the final result for <A, B, T, S> is <true, true, false, true>.
+    #[inline(always)]
     fn extract_raw_generic_prop(&mut self, did: DefId) {
 
         // Get the definition and subset reference from adt did
@@ -170,33 +171,34 @@ impl<'tcx> TypeAnalysis<'tcx> {
             _ => unreachable!(),
         };
 
-        if adt_def.is_struct() {
+        let source_enum = adt_def.is_enum();
 
-            //println!("This is for {} ", ty);
+        let mut v_res = self.adt_owner_mut().get_mut(&did).unwrap().clone();
 
-            let mut res = self.adt_owner_mut().get_mut(&did).unwrap().clone();
-            let record = res.1.clone();
+        for (variant_index, variant) in adt_def.variants.iter().enumerate() {
+            let res = v_res[variant_index as usize].clone();
 
             let mut raw_generic_prop = RawGenericPropagation::new(
                 self.tcx(),
-                record,
+                res.1.clone(),
+                source_enum,
                 self.adt_owner()
             );
 
-            for field in adt_def.all_fields() {
+            for field in &variant.fields {
                 let field_ty = field.ty(self.tcx(), substs);
-                //println!("     Field: {}", field_ty);
                 field_ty.visit_with(&mut raw_generic_prop);
             }
-
-            res.1 = raw_generic_prop.record_mut().clone();
-            self.adt_owner_mut().insert(did, res);
+            v_res[variant_index as usize] = (RawTypeOwner::Unowned, raw_generic_prop.record_mut().clone());
         }
+
+        self.adt_owner_mut().insert(did, v_res);
 
     }
 
     // Extract all types that include PhantomData<T> which T must be a raw Param
     // Consider these types as a unit to guide the traversal over adt types
+    #[inline(always)]
     fn extract_phantom_unit(&mut self, did: DefId) {
 
         // Get ty from defid and the ty is made up with generic type
@@ -213,7 +215,7 @@ impl<'tcx> TypeAnalysis<'tcx> {
         //     PhantomData<T>,  // this indicates a ownership
         // }
         if adt_def.is_struct() {
-            let mut res = self.adt_owner_mut().get_mut(&did).unwrap().clone();
+            let mut res = self.adt_owner_mut().get_mut(&did).unwrap()[0].clone();
             // Extract all fields in one given struct
             for field in adt_def.all_fields() {
                 let field_ty = field.ty(self.tcx(), substs);
@@ -229,7 +231,7 @@ impl<'tcx> TypeAnalysis<'tcx> {
                                         g_ty.visit_with(&mut raw_generic_field_subst);
                                         if raw_generic_field_subst.contains_param() {
                                             res.0 = RawTypeOwner::Owned;
-                                            self.adt_owner_mut().insert(did, res.clone());
+                                            self.adt_owner_mut().insert(did, vec![res.clone()]);
                                             return;
                                         }
                                     },
@@ -245,6 +247,7 @@ impl<'tcx> TypeAnalysis<'tcx> {
         }
     }
 
+    #[inline(always)]
     fn extract_owner_prop(&mut self, did: DefId) {
 
         // Get the definition and subset reference from adt did
@@ -254,9 +257,10 @@ impl<'tcx> TypeAnalysis<'tcx> {
             _ => unreachable!(),
         };
 
-        if adt_def.is_struct() {
+        let mut v_res = self.adt_owner_mut().get_mut(&did).unwrap().clone();
 
-            let mut res = self.adt_owner_mut().get_mut(&did).unwrap().clone();
+        for (variant_index, variant) in adt_def.variants.iter().enumerate() {
+            let res = v_res[variant_index as usize].clone();
 
             let mut owner_prop = OwnerPropagation::new(
                 self.tcx(),
@@ -264,14 +268,14 @@ impl<'tcx> TypeAnalysis<'tcx> {
                 self.adt_owner()
             );
 
-            for field in adt_def.all_fields() {
+            for field in &variant.fields {
                 let field_ty = field.ty(self.tcx(), substs);
                 field_ty.visit_with(&mut owner_prop);
             }
-
-            res.0 = owner_prop.ownership();
-            self.adt_owner_mut().insert(did, res);
+            v_res[variant_index as usize].0 = owner_prop.ownership();
         }
+
+        self.adt_owner_mut().insert(did, v_res);
     }
 }
 
@@ -402,10 +406,12 @@ impl<'tcx> TypeVisitor<'tcx> for RawGeneric<'tcx>  {
 impl<'tcx> TypeVisitor<'tcx> for RawGenericFieldSubst<'tcx> {
     type BreakTy = ();
 
+    #[inline(always)]
     fn tcx_for_anon_const_substs(&self) -> Option<TyCtxt<'tcx>> {
         Some(self.tcx)
     }
 
+    #[inline(always)]
     fn visit_ty(&mut self, ty: Ty<'tcx>) -> ControlFlow<Self::BreakTy> {
         match ty.kind() {
             TyKind::Array( .. ) => {
@@ -432,18 +438,23 @@ impl<'tcx> TypeVisitor<'tcx> for RawGenericFieldSubst<'tcx> {
 impl<'tcx, 'a> TypeVisitor<'tcx> for RawGenericPropagation<'tcx, 'a>  {
     type BreakTy = ();
 
+    #[inline(always)]
     fn tcx_for_anon_const_substs(&self) -> Option<TyCtxt<'tcx>> {
         Some(self.tcx)
     }
 
+    #[inline(always)]
     fn visit_ty(&mut self, ty: Ty<'tcx>) -> ControlFlow<Self::BreakTy> {
 
         match ty.kind() {
             TyKind::Adt(adtdef, substs) => {
-                if substs.len() == 0 { return ControlFlow::CONTINUE; }
+                if substs.len() == 0 { return ControlFlow::Break(()); }
+
+                if !self.source_enum() && adtdef.is_enum() { return ControlFlow::Break(()); }
+
+                if !self.unique_mut().insert(adtdef.did) { return ControlFlow::CONTINUE; }
 
                 let mut map_raw_generic_field_subst = HashMap::new();
-
                 for (index, subst) in substs.iter().enumerate() {
                     match subst.unpack() {
                         GenericArgKind::Lifetime( .. ) => continue,
@@ -456,50 +467,26 @@ impl<'tcx, 'a> TypeVisitor<'tcx> for RawGenericPropagation<'tcx, 'a>  {
                         }
                     }
                 }
-                if map_raw_generic_field_subst.is_empty() { return ControlFlow::CONTINUE; }
+                if map_raw_generic_field_subst.is_empty() { return ControlFlow::Break(()); }
 
-                if !self.unique_mut().insert(adtdef.did) { return ControlFlow::CONTINUE; }
+                let get_ans = self.owner().get(&adtdef.did).unwrap();
+                if get_ans.len() == 0 { return ControlFlow::Break(()); }
+                let get_ans = get_ans[0].clone();
 
-                let get_ans = self.owner().get(&adtdef.did);
-
-                // Fixme: need support for enum
-                if get_ans.is_none() {
-                    self.unique.remove(&adtdef.did);
-                    return ControlFlow::CONTINUE;
-                }
-
-                let get_ans = get_ans.unwrap();
                 for (index, flag) in  get_ans.1.iter().enumerate() {
                     if *flag && map_raw_generic_field_subst.contains_key(&index) {
                         for elem in map_raw_generic_field_subst.get(&index).unwrap().parameters() {
                             self.record[*elem] = true;
-                            //println!("          param: {} ; ans_index: {}", elem, index);
                         }
                     }
                 }
 
                 for field in adtdef.all_fields() {
                     let field_ty = field.ty(self.tcx(), substs);
-                    // match field_ty.kind() {
-                    //     TyKind::Adt(.., substs) => {
-                    //         println!("ty:{} ans:{:?} field:{} sub:{:?}",ty, get_ans, field_ty, substs);
-                    //         if substs.len() > 0 {
-                    //             for elem in substs.types() {
-                    //                 match elem.kind() {
-                    //                     TyKind::Param(x) => println!("{:?}", x),
-                    //                     _ => {},
-                    //                 };
-                    //                 break;
-                    //             }
-                    //         }
-                    //
-                    //     },
-                    //     _ => {}
-                    // }
                     field_ty.visit_with(self);
                 }
 
-                self.unique.remove(&adtdef.did);
+                self.unique_mut().remove(&adtdef.did);
 
                 ty.super_visit_with(self)
             }
@@ -520,24 +507,23 @@ impl<'tcx, 'a> TypeVisitor<'tcx> for RawGenericPropagation<'tcx, 'a>  {
 impl<'tcx, 'a> TypeVisitor<'tcx> for OwnerPropagation<'tcx, 'a> {
     type BreakTy = ();
 
+    #[inline(always)]
     fn tcx_for_anon_const_substs(&self) -> Option<TyCtxt<'tcx>> {
         Some(self.tcx)
     }
 
+    #[inline(always)]
     fn visit_ty(&mut self, ty: Ty<'tcx>) -> ControlFlow<Self::BreakTy> {
 
         match ty.kind() {
             TyKind::Adt(adtdef, substs) => {
                 if !self.unique_mut().insert(adtdef.did) { return ControlFlow::CONTINUE; }
 
-                let get_ans = self.owner().get(&adtdef.did);
+                if adtdef.is_enum() { return ControlFlow::Break(()); }
 
-                // Fixme: need support for enum
-                if get_ans.is_none() {
-                    self.unique.remove(&adtdef.did);
-                    return ControlFlow::CONTINUE;
-                }
-                let get_ans = get_ans.unwrap();
+                let get_ans = self.owner().get(&adtdef.did).unwrap();
+                if get_ans.len() == 0 { return ControlFlow::Break(()); }
+                let get_ans = get_ans[0].clone();
 
                 match get_ans.0 {
                     RawTypeOwner::Owned => { self.ownership = Owned; }
@@ -549,7 +535,7 @@ impl<'tcx, 'a> TypeVisitor<'tcx> for OwnerPropagation<'tcx, 'a> {
                     field_ty.visit_with(self);
                 }
 
-                self.unique.remove(&adtdef.did);
+                self.unique_mut().remove(&adtdef.did);
 
                 ty.super_visit_with(self)
             },
