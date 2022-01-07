@@ -3,6 +3,8 @@ use crate::log::rlc_error_and_exit;
 use rustc_demangle::try_demangle;
 
 use std::fs;
+use std::fs::File;
+use std::io::Write;
 use std::path::Path;
 
 pub fn rlc_create_dir<P: AsRef<Path>>(path: P, msg: impl AsRef<str>) {
@@ -37,11 +39,25 @@ pub fn rlc_copy_file<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q, msg: impl A
         );
 }
 
+pub fn rlc_create_file<P: AsRef<Path>>(path: P, msg: impl AsRef<str>) -> fs::File {
+    match fs::File::create(path) {
+        Ok(file) => file,
+        Err(e) => rlc_error_and_exit(format!("{}: {}", msg.as_ref(), e)),
+    }
+}
+
 pub fn rlc_read<P: AsRef<Path>>(path: P, msg: impl AsRef<str>) -> fs::File {
     match fs::File::open(path) {
         Ok(file) => file,
         Err(e) => rlc_error_and_exit(format!("{}: {}", msg.as_ref(), e)),
     }
+}
+
+pub fn rlc_write(mut file: File, buf: &[u8], msg: impl AsRef<str>) -> usize {
+    file.write(buf)
+        .unwrap_or_else(|e|
+            rlc_error_and_exit(format!("{}: {}", msg.as_ref(), e)),
+        )
 }
 
 pub fn rlc_demangle(name: &str) -> String {
