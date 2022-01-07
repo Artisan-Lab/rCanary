@@ -1,11 +1,15 @@
 use rustc_middle::ty::TyCtxt;
 
 use crate::RlcConfig;
+use crate::type_analysis::AdtOwner;
+
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct RlcGlobalCtxt<'tcx> {
     tcx: TyCtxt<'tcx>,
     config: RlcConfig,
+    adt_owner: AdtOwner,
 }
 
 impl<'tcx> RlcGlobalCtxt<'tcx> {
@@ -13,12 +17,19 @@ impl<'tcx> RlcGlobalCtxt<'tcx> {
         Self {
             tcx,
             config,
+            adt_owner: HashMap::default(),
         }
     }
 
     pub fn tcx(&self) -> TyCtxt<'tcx> {
         self.tcx
     }
-}
 
-pub type RlcCtxt<'tcx> = &'tcx RlcGlobalCtxt<'tcx>;
+    pub fn adt_owner(&self) -> &AdtOwner {
+        &self.adt_owner
+    }
+
+    pub fn adt_owner_mut(&mut self) -> &mut AdtOwner {
+        &mut self.adt_owner
+    }
+}

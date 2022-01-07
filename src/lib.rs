@@ -131,12 +131,11 @@ fn run_analyzer<F, R>(name: &str, func: F) -> R
 
 pub fn start_analyzer(tcx: TyCtxt, config: RlcConfig) {
     let rcx_boxed = Box::new(RlcGlobalCtxt::new(tcx, config));
-    let rcx = &*Box::leak(rcx_boxed);
+    let rcx = Box::leak(rcx_boxed);
 
     run_analyzer(
         "Type Analysis",
         ||
-                type_analysis::TypeAnalysis::new(&rcx).start()
+            type_analysis::TypeAnalysis::new(rcx).start()
     );
-
 }

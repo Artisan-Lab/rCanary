@@ -35,7 +35,7 @@ pub(crate) fn copy_ty_context(tc: &TyContext) -> TyContext {
     }
 }
 
-impl<'tcx> TypeAnalysis<'tcx> {
+impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
     // The 'visitor' method is our main pass of the constructor part in type analysis,
     // it will perform several important procedural to determine whether an adt definition (adt-def)
     // will occupy at least one heap allocation, reflecting holding heap-ownership in RLC system.
@@ -63,7 +63,7 @@ impl<'tcx> TypeAnalysis<'tcx> {
         #[inline]
         fn show_owner_if_needed(ref_type_analysis: &mut TypeAnalysis) {
             if !type_analysis::is_display_verbose() { return; }
-            for elem in &ref_type_analysis.adt_owner {
+            for elem in ref_type_analysis.adt_owner() {
                 let name = format!("{:?}", ref_type_analysis.tcx().type_of(*elem.0));
                 let owning = format!("{:?}", elem.1);
                 println!("{} {}", name.color(Color::Orange1).bold(), owning.color(Color::Yellow3a).bold());
@@ -287,7 +287,7 @@ impl<'tcx> TypeAnalysis<'tcx> {
 }
 
 
-impl<'tcx> Visitor<'tcx> for TypeAnalysis<'tcx> {
+impl<'tcx, 'a> Visitor<'tcx> for TypeAnalysis<'tcx, 'a> {
     fn visit_body(&mut self, body: &Body<'tcx>) {
 
         // Display the mir body if is Display MIR Verbose / Very Verbose

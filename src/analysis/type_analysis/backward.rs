@@ -1,6 +1,6 @@
 use super::TypeAnalysis;
 
-impl<'tcx> TypeAnalysis<'tcx> {
+impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
     pub fn backward(&mut self) {
 
     }

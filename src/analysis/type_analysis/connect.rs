@@ -27,7 +27,7 @@ impl CallGraph {
     pub fn graph_mut(&mut self) -> &mut Graph { &mut self.g }
 }
 
-impl<'tcx> TypeAnalysis<'tcx> {
+impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
     pub fn connect(&mut self) {
         if rlc_can_read_dir(RLC_LLVM_IR, "Cannot read LLVM IR files") {
             let mut call_graph = CallGraph::default();

@@ -3,7 +3,7 @@ use std::env;
 use rustc_middle::ty::{Ty, TyCtxt};
 use rustc_span::def_id::DefId;
 
-use crate::context::RlcCtxt;
+use crate::context::RlcGlobalCtxt;
 use crate::type_analysis::ownership::RawTypeOwner;
 
 pub mod connect;
@@ -13,7 +13,7 @@ pub mod ownership;
 
 type TyMap<'tcx> = HashMap<Ty<'tcx>, String>;
 type OwnerUnit = (RawTypeOwner, Vec<bool>);
-type AdtOwner = HashMap<DefId, Vec<OwnerUnit>>;
+pub type AdtOwner = HashMap<DefId, Vec<OwnerUnit>>;
 type Parameters = HashSet<usize>;
 pub type Unique = HashSet<DefId>;
 
@@ -21,29 +21,28 @@ pub type Unique = HashSet<DefId>;
 // for current crate and collect types after monomorphism as well as extracting 'adt-def'.
 // The struct TypeAnalysis implements mir::Visitor to simulate as the type collector.
 // Note: the type in this phase is Ty::ty rather of Hir::ty.
-#[derive(Clone)]
-pub struct TypeAnalysis<'tcx> {
-    rcx: RlcCtxt<'tcx>,
+pub struct TypeAnalysis<'tcx, 'a> {
+    rcx: &'a mut RlcGlobalCtxt<'tcx>,
     fn_set: Unique,
     ty_map: TyMap<'tcx>,
     adt_recorder: Unique,
-    adt_owner: AdtOwner,
 }
 
-impl<'tcx> TypeAnalysis<'tcx> {
-    pub fn new(rcx: RlcCtxt<'tcx>) -> Self {
+impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
+    pub fn new(rcx: &'a mut RlcGlobalCtxt<'tcx>) -> Self {
         Self {
             rcx,
             fn_set: HashSet::new(),
             ty_map: HashMap::new(),
             adt_recorder: HashSet::new(),
-            adt_owner: HashMap::new(),
         }
     }
 
-    pub fn rcx(&self) -> RlcCtxt<'tcx> {
-        self.rcx
+    pub fn rcx(&self) -> &RlcGlobalCtxt<'tcx> {
+        &self.rcx
     }
+
+    pub fn rcx_mut(&mut self) -> &mut RlcGlobalCtxt<'tcx> { &mut self.rcx }
 
     pub fn tcx(&self) -> TyCtxt<'tcx> {
         self.rcx().tcx()
@@ -65,13 +64,13 @@ impl<'tcx> TypeAnalysis<'tcx> {
         &mut self.fn_set
     }
 
-    pub fn adt_recorder(&self) -> &Unique {&self.adt_recorder}
+    pub fn adt_recorder(&self) -> &Unique { &self.adt_recorder }
 
-    pub fn adt_recorder_mut(&mut self) -> &mut Unique {&mut self.adt_recorder}
+    pub fn adt_recorder_mut(&mut self) -> &mut Unique { &mut self.adt_recorder }
 
-    pub fn adt_owner(&self) -> &AdtOwner {&self.adt_owner}
+    pub fn adt_owner(&self) -> &AdtOwner { self.rcx().adt_owner() }
 
-    pub fn adt_owner_mut(&mut self) -> &mut AdtOwner {&mut self.adt_owner}
+    pub fn adt_owner_mut(&mut self) -> &mut AdtOwner { self.rcx.adt_owner_mut() }
 
     // The main phase and the starter function of Type Collector.
     // RLC will construct an instance of struct TypeCollector and call self.start to make analysis starting.
@@ -205,7 +204,7 @@ pub enum AdtOwnerDisplay {
 
 pub fn is_display_verbose() -> bool {
     match env::var_os("ADT_DISPLAY") {
-        Some(verbose)  => true,
+        Some(_)  => true,
         _ => false,
     }
 }
