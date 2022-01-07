@@ -268,6 +268,9 @@ fn rlc_add_env(cmd: &mut Command) {
     if has_rlc_arg_flag("-MIR=VV") {
         cmd.env("MIR_DISPLAY", "VERY VERBOSE");
     }
+    if has_rlc_arg_flag("-ADT=V") {
+        cmd.env("ADT_DISPLAY", "");
+    }
 }
 
 fn phase_preprocess() {

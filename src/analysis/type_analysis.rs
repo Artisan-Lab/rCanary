@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::env;
 use rustc_middle::ty::{Ty, TyCtxt};
 use rustc_span::def_id::DefId;
 
@@ -194,4 +195,17 @@ impl<'tcx, 'a> OwnerPropagation<'tcx, 'a> {
 
     pub fn owner(&self) -> &'a AdtOwner { self.ref_adt_owner }
 
+}
+
+#[derive(Debug, Copy, Clone, Hash)]
+pub enum AdtOwnerDisplay {
+    Verbose,
+    Disabled,
+}
+
+pub fn is_display_verbose() -> bool {
+    match env::var_os("ADT_DISPLAY") {
+        Some(verbose)  => true,
+        _ => false,
+    }
 }

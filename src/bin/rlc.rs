@@ -15,6 +15,7 @@ use std::env;
 use std::fmt::{Display, Formatter};
 
 use rlc::{RlcConfig, compile_time_sysroot, RLC_DEFAULT_ARGS, start_analyzer};
+use rlc::analysis::type_analysis::AdtOwnerDisplay;
 use rlc::display::MirDisplay;
 use rlc::grain::RlcGrain;
 use rlc::log::Verbosity;
@@ -95,7 +96,9 @@ impl RlcArgs {
 
     pub fn set_mir_display_verbose(&mut self) {self.rlc_cc.rlc_config.set_mir_display(MirDisplay::Verbose); }
 
-    pub fn set_mir_display_very_verbose(&mut self) {self.rlc_cc.rlc_config.set_mir_display(MirDisplay::VeryVerobse); }
+    pub fn set_mir_display_very_verbose(&mut self) { self.rlc_cc.rlc_config.set_mir_display(MirDisplay::VeryVerobse); }
+
+    pub fn set_adt_display_verbose(&mut self) { self.rlc_cc.rlc_config.set_adt_display(AdtOwnerDisplay::Verbose); }
 
     pub fn push_args(&mut self, arg: String) { self.args.push(arg); }
 
@@ -114,6 +117,7 @@ fn config_parse() -> RlcArgs {
             "-GRAIN=ULTRA" => rlc_args.set_config_ultra(),
             "-MIR=V" => rlc_args.set_mir_display_verbose(),
             "-MIR=VV" => rlc_args.set_mir_display_very_verbose(),
+            "-ADT=V" => rlc_args.set_adt_display_verbose(),
             _ => rlc_args.push_args(arg),
         }
     }

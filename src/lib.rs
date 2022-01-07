@@ -19,6 +19,7 @@ use crate::grain::RlcGrain;
 use crate::log::Verbosity;
 use crate::context::RlcGlobalCtxt;
 use crate::display::MirDisplay;
+use crate::type_analysis::AdtOwnerDisplay;
 use crate::analysis::type_analysis;
 
 pub mod context;
@@ -42,6 +43,7 @@ pub struct RlcConfig {
     grain: RlcGrain,
     verbose: Verbosity,
     mir_display: MirDisplay,
+    adt_display: AdtOwnerDisplay,
 }
 
 impl Default for RlcConfig {
@@ -50,16 +52,18 @@ impl Default for RlcConfig {
             grain: RlcGrain::Low,
             verbose: Verbosity::Info,
             mir_display: MirDisplay::Disabled,
+            adt_display: AdtOwnerDisplay::Disabled,
         }
     }
 }
 
 impl RlcConfig {
-    pub fn new(grain: RlcGrain, verbose: Verbosity, mir_display: MirDisplay) -> Self {
+    pub fn new(grain: RlcGrain, verbose: Verbosity, mir_display: MirDisplay, adt_display: AdtOwnerDisplay) -> Self {
         Self {
             grain,
             verbose,
             mir_display,
+            adt_display,
         }
     }
 
@@ -74,6 +78,10 @@ impl RlcConfig {
     pub fn mir_display(&self) -> MirDisplay { self.mir_display }
 
     pub fn set_mir_display(&mut self, mir_display: MirDisplay) { self.mir_display = mir_display; }
+
+    pub fn adt_display(&self) -> AdtOwnerDisplay { self.adt_display }
+
+    pub fn set_adt_display(&mut self, adt_display: AdtOwnerDisplay) { self.adt_display = adt_display; }
 
 }
 

@@ -8,8 +8,10 @@ use rustc_span::def_id::DefId;
 use std::collections::HashMap;
 use std::ops::ControlFlow;
 
+use colorful::{Color, Colorful};
+
 use crate::display::{self, Display};
-use crate::type_analysis::{TypeAnalysis, OwnerPropagation, RawGeneric, RawGenericFieldSubst, RawGenericPropagation, RawTypeOwner};
+use crate::type_analysis::{self, TypeAnalysis, OwnerPropagation, RawGeneric, RawGenericFieldSubst, RawGenericPropagation, RawTypeOwner};
 use crate::type_analysis::ownership::RawTypeOwner::Owned;
 
 pub(crate) fn mir_body<'tcx>(tcx: TyCtxt<'tcx>, def_id: DefId) -> &'tcx Body<'tcx> {
@@ -58,6 +60,16 @@ impl<'tcx> TypeAnalysis<'tcx> {
             }
         }
 
+        #[inline]
+        fn show_owner_if_needed(ref_type_analysis: &mut TypeAnalysis) {
+            if !type_analysis::is_display_verbose() { return; }
+            for elem in &ref_type_analysis.adt_owner {
+                let name = format!("{:?}", ref_type_analysis.tcx().type_of(*elem.0));
+                let owning = format!("{:?}", elem.1);
+                println!("{} {}", name.color(Color::Orange1).bold(), owning.color(Color::Yellow3a).bold());
+            }
+        }
+
         // Get the Global TyCtxt from rustc
         // Grasp all mir Keys defined in current crate
         let tcx = self.tcx();
@@ -83,12 +95,7 @@ impl<'tcx> TypeAnalysis<'tcx> {
         start_channel(|did| self.extract_phantom_unit(did), &dids);
         start_channel(|did| self.extract_owner_prop(did), &dids);
 
-        // for elem in &self.adt_owner {
-        //     println!("{:?} {:?}", self.tcx().type_of(*elem.0), elem.1);
-        //     if elem.1.0 != RawTypeOwner::Unowned {
-        //         println!("{:?} {:?}", self.tcx().type_of(*elem.0), elem.1);
-        //     }
-        // }
+        show_owner_if_needed(self);
     }
 
     // Extract params in adt types, the 'param' means one generic parameter acting like 'T', 'A', etc...
