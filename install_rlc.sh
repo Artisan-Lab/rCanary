@@ -3,9 +3,9 @@
 echo "Building RLC and install RLC by Cargo"
 #cargo clean
 #for debug version
-cargo install --debug --path "$(dirname "$0")" --force --features backtraces
+#cargo install --debug --path "$(dirname "$0")" --force --features backtraces
 #for release version
-#cargo install --path "$(dirname "$0")" --force
+cargo install --path "$(dirname "$0")" --force
 
 echo "Building RLC_Phase_LLVM by CMake and add the tool into Environment"
 cd phase_llvm || exit
