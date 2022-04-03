@@ -7,8 +7,7 @@ use crate::context::RlcGlobalCtxt;
 use crate::type_analysis::ownership::RawTypeOwner;
 
 pub mod connect;
-pub mod visitor;
-pub mod backward;
+pub mod type_visitor;
 pub mod ownership;
 
 type TyMap<'tcx> = HashMap<Ty<'tcx>, String>;
@@ -16,6 +15,8 @@ type OwnerUnit = (RawTypeOwner, Vec<bool>);
 pub type AdtOwner = HashMap<DefId, Vec<OwnerUnit>>;
 type Parameters = HashSet<usize>;
 pub type Unique = HashSet<DefId>;
+pub type OwnershipLayout = Vec<RawTypeOwner>;
+pub type RustBV = Vec<bool>;
 
 // Type Analysis is the first step and it will perform a simple-inter-procedural analysis
 // for current crate and collect types after monomorphism as well as extracting 'adt-def'.
@@ -42,7 +43,9 @@ impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
         &self.rcx
     }
 
-    pub fn rcx_mut(&mut self) -> &mut RlcGlobalCtxt<'tcx> { &mut self.rcx }
+    pub fn rcx_mut(&mut self) -> &mut RlcGlobalCtxt<'tcx> {
+        &mut self.rcx
+    }
 
     pub fn tcx(&self) -> TyCtxt<'tcx> {
         self.rcx().tcx()
@@ -64,13 +67,21 @@ impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
         &mut self.fn_set
     }
 
-    pub fn adt_recorder(&self) -> &Unique { &self.adt_recorder }
+    pub fn adt_recorder(&self) -> &Unique {
+        &self.adt_recorder
+    }
 
-    pub fn adt_recorder_mut(&mut self) -> &mut Unique { &mut self.adt_recorder }
+    pub fn adt_recorder_mut(&mut self) -> &mut Unique {
+        &mut self.adt_recorder
+    }
 
-    pub fn adt_owner(&self) -> &AdtOwner { self.rcx().adt_owner() }
+    pub fn adt_owner(&self) -> &AdtOwner {
+        self.rcx().adt_owner()
+    }
 
-    pub fn adt_owner_mut(&mut self) -> &mut AdtOwner { self.rcx.adt_owner_mut() }
+    pub fn adt_owner_mut(&mut self) -> &mut AdtOwner {
+        self.rcx.adt_owner_mut()
+    }
 
     // The main phase and the starter function of Type Collector.
     // RLC will construct an instance of struct TypeCollector and call self.start to make analysis starting.
@@ -79,8 +90,6 @@ impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
         self.connect();
         // Get related adt types through visiting mir local
         self.visitor();
-        // Solving types by local ty and rlc llvm result
-        self.backward();
     }
 }
 
@@ -92,18 +101,28 @@ struct RawGeneric<'tcx> {
 
 impl<'tcx> RawGeneric<'tcx> {
 
-    pub fn new(tcx: TyCtxt<'tcx>, len: usize) -> Self {
+    pub fn new(
+        tcx: TyCtxt<'tcx>,
+        len: usize
+    ) -> Self
+    {
         Self {
             tcx,
             record: vec![false ; len],
         }
     }
 
-    pub fn tcx(&self) -> TyCtxt<'tcx> { self.tcx }
+    pub fn tcx(&self) -> TyCtxt<'tcx> {
+        self.tcx
+    }
 
-    pub fn record(&self) -> &Vec<bool> { &self.record }
+    pub fn record(&self) -> &Vec<bool> {
+        &self.record
+    }
 
-    pub fn record_mut(&mut self) -> &mut Vec<bool> { &mut self.record }
+    pub fn record_mut(&mut self) -> &mut Vec<bool> {
+        &mut self.record
+    }
 }
 
 #[derive(Clone)]
@@ -119,13 +138,21 @@ impl<'tcx> RawGenericFieldSubst<'tcx> {
             parameters: HashSet::new(),
         }
     }
-    pub fn tcx(&self) -> TyCtxt<'tcx> { self.tcx }
+    pub fn tcx(&self) -> TyCtxt<'tcx> {
+        self.tcx
+    }
 
-    pub fn parameters(&self) -> &Parameters { &self.parameters }
+    pub fn parameters(&self) -> &Parameters {
+        &self.parameters
+    }
 
-    pub fn parameters_mut(&mut self) -> &mut Parameters { &mut self.parameters }
+    pub fn parameters_mut(&mut self) -> &mut Parameters {
+        &mut self.parameters
+    }
 
-    pub fn contains_param(&self) -> bool { !self.parameters.is_empty() }
+    pub fn contains_param(&self) -> bool {
+        !self.parameters.is_empty()
+    }
 
 }
 
@@ -140,7 +167,13 @@ struct RawGenericPropagation<'tcx, 'a> {
 }
 
 impl<'tcx, 'a> RawGenericPropagation<'tcx, 'a> {
-    pub fn new(tcx: TyCtxt<'tcx>, record: Vec<bool>, source_enum: bool, ref_adt_owner: &'a AdtOwner) -> Self {
+    pub fn new(
+        tcx: TyCtxt<'tcx>,
+        record: Vec<bool>,
+        source_enum: bool,
+        ref_adt_owner: &'a AdtOwner
+    ) -> Self
+    {
         Self {
             tcx,
             record,
@@ -150,19 +183,33 @@ impl<'tcx, 'a> RawGenericPropagation<'tcx, 'a> {
         }
     }
 
-    pub fn tcx(&self) -> TyCtxt<'tcx> { self.tcx }
+    pub fn tcx(&self) -> TyCtxt<'tcx> {
+        self.tcx
+    }
 
-    pub fn record(&self) -> &Vec<bool> { &self.record }
+    pub fn record(&self) -> &Vec<bool> {
+        &self.record
+    }
 
-    pub fn record_mut(&mut self) -> &mut Vec<bool> { &mut self.record }
+    pub fn record_mut(&mut self) -> &mut Vec<bool> {
+        &mut self.record
+    }
 
-    pub fn unique(&self) -> &Unique { &self.unique }
+    pub fn unique(&self) -> &Unique {
+        &self.unique
+    }
 
-    pub fn unique_mut(&mut self) -> &mut Unique { &mut self.unique }
+    pub fn unique_mut(&mut self) -> &mut Unique {
+        &mut self.unique
+    }
 
-    pub fn source_enum(&mut self) -> bool { self.source_enum }
+    pub fn source_enum(&mut self) -> bool {
+        self.source_enum
+    }
 
-    pub fn owner(&self) -> &'a AdtOwner { self.ref_adt_owner }
+    pub fn owner(&self) -> &'a AdtOwner {
+        self.ref_adt_owner
+    }
 
 }
 
@@ -175,7 +222,12 @@ struct OwnerPropagation<'tcx, 'a> {
 }
 
 impl<'tcx, 'a> OwnerPropagation<'tcx, 'a> {
-    pub fn new(tcx: TyCtxt<'tcx>, ownership: RawTypeOwner, ref_adt_owner: &'a AdtOwner) -> Self {
+    pub fn new(
+        tcx: TyCtxt<'tcx>,
+        ownership: RawTypeOwner,
+        ref_adt_owner: &'a AdtOwner
+    ) -> Self
+    {
         Self {
             tcx,
             ownership,
@@ -184,15 +236,105 @@ impl<'tcx, 'a> OwnerPropagation<'tcx, 'a> {
         }
     }
 
-    pub fn tcx(&self) -> TyCtxt<'tcx> { self.tcx }
+    pub fn tcx(&self) -> TyCtxt<'tcx> {
+        self.tcx
+    }
 
-    pub fn ownership(&self) -> RawTypeOwner { self.ownership }
+    pub fn ownership(&self) -> RawTypeOwner {
+        self.ownership
+    }
 
-    pub fn unique(&self) -> &Unique { &self.unique }
+    pub fn unique(&self) -> &Unique {
+        &self.unique
+    }
 
-    pub fn unique_mut(&mut self) -> &mut Unique { &mut self.unique }
+    pub fn unique_mut(&mut self) -> &mut Unique {
+        &mut self.unique
+    }
 
-    pub fn owner(&self) -> &'a AdtOwner { self.ref_adt_owner }
+    pub fn owner(&self) -> &'a AdtOwner {
+        self.ref_adt_owner
+    }
+
+}
+
+#[derive(Clone)]
+pub struct DefaultOwnership<'tcx, 'a> {
+    tcx: TyCtxt<'tcx>,
+    unique: Unique,
+    ref_adt_owner: &'a AdtOwner,
+    res: RawTypeOwner,
+    param: bool,
+    ptr: bool,
+}
+
+impl<'tcx, 'a> DefaultOwnership<'tcx, 'a> {
+    pub fn new(
+        tcx: TyCtxt<'tcx>,
+        ref_adt_owner: &'a AdtOwner
+    ) -> Self
+    {
+        Self {
+            tcx,
+            unique: HashSet::new(),
+            ref_adt_owner,
+            res: RawTypeOwner::Unowned,
+            param: false,
+            ptr: false,
+        }
+    }
+
+    pub fn tcx(&self) -> TyCtxt<'tcx> {
+        self.tcx
+    }
+
+    pub fn unique(&self) -> &Unique {
+        &self.unique
+    }
+
+    pub fn unique_mut(&mut self) -> &mut Unique {
+        &mut self.unique
+    }
+
+    pub fn get_res(&self) -> RawTypeOwner {
+        self.res
+    }
+
+    pub fn set_res(&mut self, res: RawTypeOwner) {
+        self.res = res;
+    }
+
+    pub fn is_owning_true(&self) -> bool {
+        self.res == RawTypeOwner::Owned
+    }
+
+    pub fn get_param(&self) -> bool {
+        self.param
+    }
+
+    pub fn set_param(&mut self, p: bool) {
+        self.param = p;
+    }
+
+    pub fn is_param_true(&self) -> bool {
+        self.param == true
+    }
+
+    pub fn get_ptr(&self) -> bool {
+        self.ptr
+    }
+
+    pub fn set_ptr(&mut self, p: bool) {
+        self.ptr = p;
+    }
+
+    pub fn is_ptr_true(&self) -> bool {
+        self.ptr == true
+    }
+
+    pub fn owner(&self) -> &'a AdtOwner {
+        self.ref_adt_owner
+    }
 
 }
 

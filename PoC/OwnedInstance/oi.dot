@@ -1,0 +1,11 @@
+digraph Mir_0_6 {
+    graph [fontname="Courier, monospace"];
+    node [fontname="Courier, monospace"];
+    edge [fontname="Courier, monospace"];
+    label=<fn main() -&gt; ()<br align="left"/>let _1: std::boxed::Box&lt;&amp;str&gt;;<br align="left"/>let _2: std::mem::ManuallyDrop&lt;std::boxed::Box&lt;&amp;str&gt;&gt;;<br align="left"/>let mut _3: std::boxed::Box&lt;&amp;str&gt;;<br align="left"/>debug b =&gt; _1;<br align="left"/>debug b1 =&gt; _2;<br align="left"/>>;
+    bb0__0_6 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td bgcolor="gray" align="center" colspan="1">0</td></tr><tr><td align="left">_1 = Box::&lt;&amp;str&gt;::new(const &quot;boxed&quot;)</td></tr></table>>];
+    bb1__0_6 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td bgcolor="gray" align="center" colspan="1">1</td></tr><tr><td align="left" balign="left">_3 = move _1<br/></td></tr><tr><td align="left">_2 = ManuallyDrop::&lt;Box&lt;&amp;str&gt;&gt;::new(move _3)</td></tr></table>>];
+    bb2__0_6 [shape="none", label=<<table border="0" cellborder="1" cellspacing="0"><tr><td bgcolor="gray" align="center" colspan="1">2</td></tr><tr><td align="left">return</td></tr></table>>];
+    bb0__0_6 -> bb1__0_6 [label="return"];
+    bb1__0_6 -> bb2__0_6 [label="return"];
+}

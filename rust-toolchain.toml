@@ -1,4 +1,4 @@
 [toolchain]
 # The default version of the rustc compiler
-channel = "nightly-2021-12-06"
-components = ["rustc-dev", "llvm-tools-preview", "rust-src"]
+channel = "nightly-2022-03-20"
+components = ["rustc-dev", "rust-src"]

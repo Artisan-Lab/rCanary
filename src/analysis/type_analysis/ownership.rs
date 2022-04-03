@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 use rustc_middle::ty::Ty;
+use crate::type_analysis::{DefaultOwnership, OwnershipLayout};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum RawTypeOwner {
@@ -27,4 +28,69 @@ impl RawTypeOwner {
 pub enum TypeOwner<'tcx> {
     Owned(Ty<'tcx>),
     Unowned,
+}
+
+#[derive(Clone, Debug)]
+pub struct OwnershipLayoutResult {
+    layout: OwnershipLayout,
+    param: bool,
+    requirement: bool,
+}
+
+impl OwnershipLayoutResult {
+    pub fn new() -> Self {
+        Self {
+            layout: Vec::new(),
+            param: false,
+            requirement: false,
+        }
+    }
+
+    pub fn layout(&self) -> &OwnershipLayout {
+        &self.layout
+    }
+
+    pub fn layout_mut(&mut self) -> &mut OwnershipLayout {
+        &mut self.layout
+    }
+
+    pub fn get_param(&self) -> bool {
+        self.param
+    }
+
+    pub fn set_param(&mut self, p: bool) {
+        self.param = p;
+    }
+
+    pub fn is_param_true(&self) -> bool {
+        self.param == true
+    }
+
+    pub fn get_requirement(&self) -> bool {
+        self.requirement
+    }
+
+    pub fn set_requirement(&mut self, r: bool) {
+        self.requirement = r;
+    }
+
+    pub fn is_requirement_true(&self) -> bool {
+        self.requirement == true
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.layout.is_empty()
+    }
+
+    pub fn update_from_default_ownership_visitor<'tcx, 'a>(&mut self, default_ownership: &mut DefaultOwnership<'tcx, 'a>) {
+
+        if default_ownership.is_owning_true() || default_ownership.is_ptr_true() {
+            self.set_requirement(true);
+        }
+
+        self.layout_mut().push(default_ownership.get_res());
+
+        self.set_param(default_ownership.get_param());
+    }
+
 }

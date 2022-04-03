@@ -239,4 +239,6 @@ int main(int argc, char **argv) {
     }
 
     emit_call_graph(f_map, argv[1]);
+
+    outs().changeColor(raw_ostream::BLACK, true);
 }

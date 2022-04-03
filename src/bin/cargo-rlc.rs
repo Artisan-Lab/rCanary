@@ -34,7 +34,9 @@ Examples:
 "#;
 
 
-fn show_help() { println!("{}", CARGO_RLC_HELP); }
+fn show_help() {
+    println!("{}", CARGO_RLC_HELP);
+}
 
 fn show_version() {
     let version = format!("rlc {}", env!("CARGO_PKG_VERSION"));
@@ -106,7 +108,9 @@ fn find_rlc() -> PathBuf {
     path
 }
 
-fn rlc() -> Command { Command::new(find_rlc()) }
+fn rlc() -> Command {
+    Command::new(find_rlc())
+}
 
 fn version_info() -> VersionMeta {
     VersionMeta::for_command(rlc()).
@@ -271,6 +275,13 @@ fn rlc_add_env(cmd: &mut Command) {
     if has_rlc_arg_flag("-ADT=V") {
         cmd.env("ADT_DISPLAY", "");
     }
+    if has_rlc_arg_flag("-Z3-GOAL=V") {
+        cmd.env("Z3_GOAL", "");
+    }
+    if has_rlc_arg_flag("-ICX-SLICE=V") {
+        cmd.env("ICX_SLICE", "");
+    }
+
 }
 
 fn phase_preprocess() {

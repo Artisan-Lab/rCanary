@@ -22,9 +22,13 @@ impl Default for CallGraph {
 }
 
 impl CallGraph {
-    pub fn graph(&self) -> &Graph { &self.g }
+    pub fn graph(&self) -> &Graph {
+        &self.g
+    }
 
-    pub fn graph_mut(&mut self) -> &mut Graph { &mut self.g }
+    pub fn graph_mut(&mut self) -> &mut Graph {
+        &mut self.g
+    }
 }
 
 impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {

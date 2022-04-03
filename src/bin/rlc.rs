@@ -15,6 +15,7 @@ use std::env;
 use std::fmt::{Display, Formatter};
 
 use rlc::{RlcConfig, compile_time_sysroot, RLC_DEFAULT_ARGS, start_analyzer};
+use rlc::analysis::flow_analysis::{IcxSliceDisplay, Z3GoalDisplay};
 use rlc::analysis::type_analysis::AdtOwnerDisplay;
 use rlc::display::MirDisplay;
 use rlc::grain::RlcGrain;
@@ -100,6 +101,10 @@ impl RlcArgs {
 
     pub fn set_adt_display_verbose(&mut self) { self.rlc_cc.rlc_config.set_adt_display(AdtOwnerDisplay::Verbose); }
 
+    pub fn set_z3_goal_display_verbose(&mut self) { self.rlc_cc.rlc_config.set_z3_goal_display(Z3GoalDisplay::Verbose); }
+
+    pub fn set_icx_slice_display(&mut self) { self.rlc_cc.rlc_config.set_icx_slice_display(IcxSliceDisplay::Verbose); }
+
     pub fn push_args(&mut self, arg: String) { self.args.push(arg); }
 
     pub fn splice_args(&mut self) {
@@ -118,6 +123,8 @@ fn config_parse() -> RlcArgs {
             "-MIR=V" => rlc_args.set_mir_display_verbose(),
             "-MIR=VV" => rlc_args.set_mir_display_very_verbose(),
             "-ADT=V" => rlc_args.set_adt_display_verbose(),
+            "-Z3-GOAL=V" => rlc_args.set_z3_goal_display_verbose(),
+            "-ICX-SLICE=V" => rlc_args.set_icx_slice_display(),
             _ => rlc_args.push_args(arg),
         }
     }

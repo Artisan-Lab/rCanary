@@ -29,7 +29,7 @@ impl Verbosity {
                 .format(|callback, args, record| {
                     callback.finish(format_args!(
                         "{} |RLC OUTPUT-{:5}| {}",
-                        Local::now(),
+                        Local::now().date(),
                         record.level(),
                         args,
                     ))

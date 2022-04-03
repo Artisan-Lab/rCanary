@@ -1,17 +1,24 @@
 #![feature(rustc_private)]
 #![feature(backtrace)]
 #![feature(control_flow_enum)]
+#![feature(box_patterns)]
 #![cfg_attr(debug_assertions, allow(dead_code, unused_imports, unused_variables, unused_mut, dead_code, unused_must_use))]
+#![cfg_attr(not(debug_assertions), allow(dead_code, unused_imports, unused_variables, unused_mut, dead_code, unused_must_use))]
+
 
 extern crate rustc_middle;
 extern crate rustc_hir;
 extern crate rustc_span;
 extern crate rustc_index;
+extern crate rustc_target;
+
 extern crate serde;
 extern crate serde_json;
 
+
 #[macro_use]
 extern crate serde_derive;
+extern crate core;
 
 use rustc_middle::ty::TyCtxt;
 
@@ -20,7 +27,8 @@ use crate::log::Verbosity;
 use crate::context::RlcGlobalCtxt;
 use crate::display::MirDisplay;
 use crate::type_analysis::AdtOwnerDisplay;
-use crate::analysis::type_analysis;
+use crate::analysis::{type_analysis, flow_analysis};
+use crate::flow_analysis::{IcxSliceDisplay, Z3GoalDisplay};
 
 pub mod context;
 pub mod display;
@@ -44,6 +52,8 @@ pub struct RlcConfig {
     verbose: Verbosity,
     mir_display: MirDisplay,
     adt_display: AdtOwnerDisplay,
+    z3_goal_display: Z3GoalDisplay,
+    icx_slice_display: IcxSliceDisplay,
 }
 
 impl Default for RlcConfig {
@@ -53,17 +63,28 @@ impl Default for RlcConfig {
             verbose: Verbosity::Info,
             mir_display: MirDisplay::Disabled,
             adt_display: AdtOwnerDisplay::Disabled,
+            z3_goal_display: Z3GoalDisplay::Disabled,
+            icx_slice_display: IcxSliceDisplay::Disabled,
         }
     }
 }
 
 impl RlcConfig {
-    pub fn new(grain: RlcGrain, verbose: Verbosity, mir_display: MirDisplay, adt_display: AdtOwnerDisplay) -> Self {
+    pub fn new(
+        grain: RlcGrain,
+        verbose: Verbosity,
+        mir_display: MirDisplay,
+        adt_display: AdtOwnerDisplay,
+        z3_goal_display: Z3GoalDisplay,
+        icx_slice_display: IcxSliceDisplay,
+    ) -> Self {
         Self {
             grain,
             verbose,
             mir_display,
             adt_display,
+            z3_goal_display,
+            icx_slice_display,
         }
     }
 
@@ -82,6 +103,14 @@ impl RlcConfig {
     pub fn adt_display(&self) -> AdtOwnerDisplay { self.adt_display }
 
     pub fn set_adt_display(&mut self, adt_display: AdtOwnerDisplay) { self.adt_display = adt_display; }
+
+    pub fn z3_goal_display(&self) -> Z3GoalDisplay { self.z3_goal_display }
+
+    pub fn set_z3_goal_display(&mut self, z3_goal_display: Z3GoalDisplay) { self.z3_goal_display = z3_goal_display; }
+
+    pub fn icx_slice_display(&self) -> IcxSliceDisplay { self.icx_slice_display }
+
+    pub fn set_icx_slice_display(&mut self, icx_slice_display: IcxSliceDisplay) { self.icx_slice_display = icx_slice_display; }
 
 }
 
@@ -137,5 +166,11 @@ pub fn start_analyzer(tcx: TyCtxt, config: RlcConfig) {
         "Type Analysis",
         ||
             type_analysis::TypeAnalysis::new(rcx).start()
+    );
+
+    run_analyzer(
+        "Flow Analysis",
+        ||
+            flow_analysis::FlowAnalysis::new(rcx).start()
     );
 }

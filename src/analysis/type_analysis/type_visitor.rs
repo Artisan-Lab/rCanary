@@ -3,7 +3,9 @@ use rustc_middle::ty::subst::GenericArgKind;
 use rustc_middle::mir::visit::{Visitor, TyContext};
 use rustc_middle::mir::{Body, BasicBlock, BasicBlockData, Local, LocalDecl, Operand};
 use rustc_middle::mir::terminator::TerminatorKind;
+use rustc_middle::mir::tcx::PlaceTy;
 use rustc_span::def_id::DefId;
+use rustc_target::abi::VariantIdx;
 
 use std::collections::HashMap;
 use std::ops::ControlFlow;
@@ -11,7 +13,8 @@ use std::ops::ControlFlow;
 use colorful::{Color, Colorful};
 
 use crate::display::{self, Display};
-use crate::type_analysis::{self, TypeAnalysis, OwnerPropagation, RawGeneric, RawGenericFieldSubst, RawGenericPropagation, RawTypeOwner};
+use crate::rlc_error;
+use crate::type_analysis::{self, TypeAnalysis, OwnerPropagation, RawGeneric, RawGenericFieldSubst, RawGenericPropagation, RawTypeOwner, DefaultOwnership};
 use crate::type_analysis::ownership::RawTypeOwner::Owned;
 
 pub(crate) fn mir_body<'tcx>(tcx: TyCtxt<'tcx>, def_id: DefId) -> &'tcx Body<'tcx> {
@@ -60,14 +63,22 @@ impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
             }
         }
 
-        #[inline]
+        #[inline(always)]
         fn show_owner_if_needed(ref_type_analysis: &mut TypeAnalysis) {
             if !type_analysis::is_display_verbose() { return; }
             for elem in ref_type_analysis.adt_owner() {
                 let name = format!("{:?}", ref_type_analysis.tcx().type_of(*elem.0));
                 let owning = format!("{:?}", elem.1);
-                println!("{} {}", name.color(Color::Orange1).bold(), owning.color(Color::Yellow3a).bold());
+                println!("{} {}", name.color(Color::Orange1), owning.color(Color::Yellow3a));
             }
+        }
+
+        #[inline(always)]
+        fn show_mir_if_needed<'tcx>(body: &Body<'tcx>) {
+            // Display the mir body if is Display MIR Verbose / Very Verbose
+            if !display::is_display_verbose() { return; }
+            println!("{}", body.local_decls.display().color(Color::Green));
+            println!("{}", body.basic_blocks().display().color(Color::LightGray));
         }
 
         // Get the Global TyCtxt from rustc
@@ -79,6 +90,7 @@ impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
             // Get the defid of current crate and get mir Body through this id
             let def_id = each_mir.to_def_id();
             let body = mir_body(tcx, def_id);
+            show_mir_if_needed(body);
 
             // Insert the defid to hashset if is not existed and visit the body
             if self.fn_set_mut().insert(def_id) {
@@ -126,7 +138,7 @@ impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
 
         let mut v_res = Vec::new();
 
-        for variant in adt_def.variants.iter() {
+        for variant in adt_def.variants().iter() {
             let mut raw_generic = RawGeneric::new(self.tcx(), substs.len());
 
             for field in &variant.fields {
@@ -182,7 +194,7 @@ impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
 
         let mut v_res = self.adt_owner_mut().get_mut(&did).unwrap().clone();
 
-        for (variant_index, variant) in adt_def.variants.iter().enumerate() {
+        for (variant_index, variant) in adt_def.variants().iter().enumerate() {
             let res = v_res[variant_index as usize].clone();
 
             let mut raw_generic_prop = RawGenericPropagation::new(
@@ -266,7 +278,7 @@ impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
 
         let mut v_res = self.adt_owner_mut().get_mut(&did).unwrap().clone();
 
-        for (variant_index, variant) in adt_def.variants.iter().enumerate() {
+        for (variant_index, variant) in adt_def.variants().iter().enumerate() {
             let res = v_res[variant_index as usize].clone();
 
             let mut owner_prop = OwnerPropagation::new(
@@ -290,11 +302,6 @@ impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
 impl<'tcx, 'a> Visitor<'tcx> for TypeAnalysis<'tcx, 'a> {
     fn visit_body(&mut self, body: &Body<'tcx>) {
 
-        // Display the mir body if is Display MIR Verbose / Very Verbose
-        if display::is_display_verbose() {
-            println!("{}", body.display());
-        }
-
         for (local, local_decl) in body.local_decls.iter().enumerate() {
             self.visit_local_decl(Local::from(local), local_decl);
         }
@@ -315,11 +322,11 @@ impl<'tcx, 'a> Visitor<'tcx> for TypeAnalysis<'tcx, 'a> {
         match ty.kind() {
             TyKind::Adt(adtdef, substs) => {
 
-                if self.ty_map().get(ty).is_some() {
+                if self.ty_map().get(&ty).is_some() {
                     return;
                 }
                 self.ty_map_mut().insert(ty, format!("{:?}", ty));
-                self.adt_recorder_mut().insert(adtdef.did);
+                self.adt_recorder_mut().insert(adtdef.did());
 
                 for field in adtdef.all_fields() {
                     self.visit_ty(field.ty(self.tcx(), substs) ,copy_ty_context(&ty_context))
@@ -330,24 +337,21 @@ impl<'tcx, 'a> Visitor<'tcx> for TypeAnalysis<'tcx, 'a> {
                 }
             },
             TyKind::Array(ty, ..) => {
-                self.visit_ty(ty, ty_context);
+                self.visit_ty(*ty, ty_context);
             },
             TyKind::Slice(ty) => {
-                self.visit_ty(ty, ty_context);
+                self.visit_ty(*ty, ty_context);
             },
             TyKind::RawPtr(typeandmut) => {
                 let ty = typeandmut.ty;
                 self.visit_ty(ty, ty_context);
             },
             TyKind::Ref(_, ty, ..) => {
-                self.visit_ty(ty, ty_context);
+                self.visit_ty(*ty, ty_context);
             },
-            TyKind::Tuple(substs) => {
-                for tuple_ty in ty.tuple_fields() {
-                    self.visit_ty(tuple_ty, copy_ty_context(&ty_context));
-                }
-                for ty in substs.types() {
-                    self.visit_ty(ty, copy_ty_context(&ty_context));
+            TyKind::Tuple(tuple_fields) => {
+                for field in tuple_fields.iter() {
+                    self.visit_ty(field, copy_ty_context(&ty_context));
                 }
             },
             _ => return,
@@ -387,9 +391,9 @@ impl<'tcx> TypeVisitor<'tcx> for RawGeneric<'tcx>  {
 
     type BreakTy = ();
 
-    fn tcx_for_anon_const_substs(&self) -> Option<TyCtxt<'tcx>> {
-        Some(self.tcx)
-    }
+    // fn tcx_for_anon_const_substs(&self) -> Option<TyCtxt<'tcx>> {
+    //     Some(self.tcx)
+    // }
 
     fn visit_ty(&mut self, ty: Ty<'tcx>) -> ControlFlow<Self::BreakTy> {
         match ty.kind() {
@@ -413,10 +417,10 @@ impl<'tcx> TypeVisitor<'tcx> for RawGeneric<'tcx>  {
 impl<'tcx> TypeVisitor<'tcx> for RawGenericFieldSubst<'tcx> {
     type BreakTy = ();
 
-    #[inline(always)]
-    fn tcx_for_anon_const_substs(&self) -> Option<TyCtxt<'tcx>> {
-        Some(self.tcx)
-    }
+    // #[inline(always)]
+    // fn tcx_for_anon_const_substs(&self) -> Option<TyCtxt<'tcx>> {
+    //     Some(self.tcx)
+    // }
 
     #[inline(always)]
     fn visit_ty(&mut self, ty: Ty<'tcx>) -> ControlFlow<Self::BreakTy> {
@@ -445,10 +449,10 @@ impl<'tcx> TypeVisitor<'tcx> for RawGenericFieldSubst<'tcx> {
 impl<'tcx, 'a> TypeVisitor<'tcx> for RawGenericPropagation<'tcx, 'a>  {
     type BreakTy = ();
 
-    #[inline(always)]
-    fn tcx_for_anon_const_substs(&self) -> Option<TyCtxt<'tcx>> {
-        Some(self.tcx)
-    }
+    // #[inline(always)]
+    // fn tcx_for_anon_const_substs(&self) -> Option<TyCtxt<'tcx>> {
+    //     Some(self.tcx)
+    // }
 
     #[inline(always)]
     fn visit_ty(&mut self, ty: Ty<'tcx>) -> ControlFlow<Self::BreakTy> {
@@ -459,7 +463,7 @@ impl<'tcx, 'a> TypeVisitor<'tcx> for RawGenericPropagation<'tcx, 'a>  {
 
                 if !self.source_enum() && adtdef.is_enum() { return ControlFlow::Break(()); }
 
-                if !self.unique_mut().insert(adtdef.did) { return ControlFlow::CONTINUE; }
+                if !self.unique_mut().insert(adtdef.did()) { return ControlFlow::CONTINUE; }
 
                 let mut map_raw_generic_field_subst = HashMap::new();
                 for (index, subst) in substs.iter().enumerate() {
@@ -476,7 +480,7 @@ impl<'tcx, 'a> TypeVisitor<'tcx> for RawGenericPropagation<'tcx, 'a>  {
                 }
                 if map_raw_generic_field_subst.is_empty() { return ControlFlow::Break(()); }
 
-                let get_ans = self.owner().get(&adtdef.did).unwrap();
+                let get_ans = self.owner().get(&adtdef.did()).unwrap();
                 if get_ans.len() == 0 { return ControlFlow::Break(()); }
                 let get_ans = get_ans[0].clone();
 
@@ -493,7 +497,7 @@ impl<'tcx, 'a> TypeVisitor<'tcx> for RawGenericPropagation<'tcx, 'a>  {
                     field_ty.visit_with(self);
                 }
 
-                self.unique_mut().remove(&adtdef.did);
+                self.unique_mut().remove(&adtdef.did());
 
                 ty.super_visit_with(self)
             }
@@ -514,21 +518,21 @@ impl<'tcx, 'a> TypeVisitor<'tcx> for RawGenericPropagation<'tcx, 'a>  {
 impl<'tcx, 'a> TypeVisitor<'tcx> for OwnerPropagation<'tcx, 'a> {
     type BreakTy = ();
 
-    #[inline(always)]
-    fn tcx_for_anon_const_substs(&self) -> Option<TyCtxt<'tcx>> {
-        Some(self.tcx)
-    }
+    // #[inline(always)]
+    // fn tcx_for_anon_const_substs(&self) -> Option<TyCtxt<'tcx>> {
+    //     Some(self.tcx)
+    // }
 
     #[inline(always)]
     fn visit_ty(&mut self, ty: Ty<'tcx>) -> ControlFlow<Self::BreakTy> {
 
         match ty.kind() {
             TyKind::Adt(adtdef, substs) => {
-                if !self.unique_mut().insert(adtdef.did) { return ControlFlow::CONTINUE; }
+                if !self.unique_mut().insert(adtdef.did()) { return ControlFlow::CONTINUE; }
 
                 if adtdef.is_enum() { return ControlFlow::Break(()); }
 
-                let get_ans = self.owner().get(&adtdef.did).unwrap();
+                let get_ans = self.owner().get(&adtdef.did()).unwrap();
                 if get_ans.len() == 0 { return ControlFlow::Break(()); }
                 let get_ans = get_ans[0].clone();
 
@@ -542,7 +546,7 @@ impl<'tcx, 'a> TypeVisitor<'tcx> for OwnerPropagation<'tcx, 'a> {
                     field_ty.visit_with(self);
                 }
 
-                self.unique_mut().remove(&adtdef.did);
+                self.unique_mut().remove(&adtdef.did());
 
                 ty.super_visit_with(self)
             },
@@ -556,5 +560,116 @@ impl<'tcx, 'a> TypeVisitor<'tcx> for OwnerPropagation<'tcx, 'a> {
                 ControlFlow::CONTINUE
             },
         }
+    }
+}
+
+impl<'tcx, 'a> TypeVisitor<'tcx> for DefaultOwnership<'tcx, 'a>   {
+    type BreakTy = ();
+
+    // #[inline(always)]
+    // fn tcx_for_anon_const_substs(&self) -> Option<TyCtxt<'tcx>> {
+    //     Some(self.tcx)
+    // }
+
+    #[inline(always)]
+    fn visit_ty(&mut self, ty: Ty<'tcx>) -> ControlFlow<Self::BreakTy> {
+
+        match ty.kind() {
+            TyKind::Adt(adtdef, substs) => {
+
+                if adtdef.is_enum() {
+                    return ControlFlow::Break(());
+                }
+
+                if !self.unique_mut().insert(adtdef.did()) { return ControlFlow::CONTINUE; }
+
+                let get_ans = self.owner().get(&adtdef.did()).unwrap();
+
+                // handle the secene of Zero Sized Types
+                if get_ans.len() == 0 { return ControlFlow::Break(()); }
+                let (unit_res, generic_list) = get_ans[0].clone();
+
+                match unit_res {
+                    RawTypeOwner::Owned => {
+                        self.set_res(RawTypeOwner::Owned);
+                        return ControlFlow::Break(())
+                    },
+                    RawTypeOwner::Unowned => {
+                        for (index, each_generic) in generic_list.iter().enumerate() {
+                            if *each_generic {
+                                continue;
+                            } else {
+                                let subset_ty = substs[index].expect_ty();
+                                self.unique_mut().remove(&adtdef.did());
+                                subset_ty.visit_with(self);
+                            }
+                        }
+                    }
+                    _ => {
+                      unreachable!();
+                    },
+                }
+
+                ControlFlow::CONTINUE
+            },
+            TyKind::Array( .. ) => {
+                ty.super_visit_with(self)
+            },
+            TyKind::Tuple( .. ) => {
+                ty.super_visit_with(self)
+            },
+            TyKind::Param(param_ty) => {
+                self.set_param(true);
+                self.set_res(RawTypeOwner::Owned);
+
+                ControlFlow::Break(())
+            },
+            TyKind::RawPtr( .. ) => {
+                self.set_ptr(true);
+                ControlFlow::CONTINUE
+            },
+            TyKind::Ref( .. ) => {
+                self.set_ptr(true);
+                ControlFlow::CONTINUE
+            },
+            _ => {
+                ControlFlow::CONTINUE
+            },
+        }
+    }
+
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Default)]
+pub struct TyWithIndex<'tcx>(pub Option<(usize, &'tcx TyKind<'tcx>, Option<usize>)>);
+
+pub fn extract_layout_len_and_ty<'tcx>(ty: Ty<'tcx>, vidx: Option<VariantIdx>) -> TyWithIndex<'tcx> {
+    match &ty.kind() {
+        TyKind::Tuple( list ) => {
+            TyWithIndex(Some((list.len(), &ty.kind(), None)))
+        },
+        TyKind::Array( .. ) => {
+            TyWithIndex(Some((1, &ty.kind(), None)))
+        },
+        TyKind::Param( .. ) => {
+            TyWithIndex(Some((1, &ty.kind(), None)))
+        },
+        TyKind::Adt(adtdef, ..) => {
+            if adtdef.is_enum() {
+                let idx = vidx.unwrap();
+                let len = adtdef.variants()[idx].fields.len();
+                TyWithIndex(Some((len, &ty.kind(), Some(idx.index()))))
+            } else {
+                let len = adtdef.variants()[VariantIdx::from_usize(0)].fields.len();
+                TyWithIndex(Some((len, &ty.kind(), None)))
+            }
+        },
+        TyKind::RawPtr( .. ) => {
+            TyWithIndex(Some((1, &ty.kind(), None)))
+        },
+        TyKind::Ref( .. ) => {
+            TyWithIndex(Some((1, &ty.kind(), None)))
+        },
+        _ => TyWithIndex(None),
     }
 }

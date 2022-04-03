@@ -138,8 +138,6 @@ impl<'tcx> Display for StatementKind<'tcx> {
                     s += "StorageLive",
                 StatementKind::StorageDead( .. ) =>
                     s += "StorageDead",
-                StatementKind::LlvmInlineAsm( .. ) =>
-                    s += "LlvmInlineAsm",
                 StatementKind::Retag( .. ) =>
                     s += "Retag",
                 StatementKind::AscribeUserType( .. ) =>
