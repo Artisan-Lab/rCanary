@@ -12,9 +12,8 @@ use colorful::{Color, Colorful};
 
 use crate::display::{self, Display};
 use crate::type_analysis::{self, TypeAnalysis, OwnerPropagation, RawGeneric, RawGenericFieldSubst, RawGenericPropagation, RawTypeOwner, DefaultOwnership};
-use crate::type_analysis::ownership::RawTypeOwner::Owned;
 
-pub(crate) fn mir_body<'tcx>(tcx: TyCtxt<'tcx>, def_id: DefId) -> &'tcx Body<'tcx> {
+pub(crate) fn mir_body(tcx: TyCtxt, def_id: DefId) -> &Body {
     let id = ty::WithOptConstParam::unknown(def_id);
     let def = ty::InstanceDef::Item(id);
     tcx.instance_mir(def)
@@ -71,7 +70,7 @@ impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
         }
 
         #[inline(always)]
-        fn show_mir_if_needed<'tcx>(body: &Body<'tcx>) {
+        fn show_mir_if_needed(body: &Body) {
             // Display the mir body if is Display MIR Verbose / Very Verbose
             if !display::is_display_verbose() { return; }
             println!("{}", body.local_decls.display().color(Color::Green));
@@ -534,7 +533,7 @@ impl<'tcx, 'a> TypeVisitor<'tcx> for OwnerPropagation<'tcx, 'a> {
                 let get_ans = get_ans[0].clone();
 
                 match get_ans.0 {
-                    RawTypeOwner::Owned => { self.ownership = Owned; }
+                    RawTypeOwner::Owned => { self.ownership = RawTypeOwner::Owned; }
                     _ => (),
                 };
 

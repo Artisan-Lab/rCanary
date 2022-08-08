@@ -1,15 +1,15 @@
-use std::collections::{HashMap, HashSet};
-use std::fmt::{Debug, Formatter};
-use std::env;
-
 use rustc_middle::ty::TyCtxt;
 use rustc_span::def_id::DefId;
 use rustc_middle::mir::Body;
-use crate::flow_analysis::ownership::{IntroVar, Taint};
 
 use crate::RlcGlobalCtxt;
 use crate::type_analysis::{AdtOwner, OwnershipLayout, Unique};
 use crate::type_analysis::type_visitor::{mir_body, TyWithIndex};
+use crate::flow_analysis::ownership::{IntroVar, Taint};
+
+use std::collections::{HashMap, HashSet};
+use std::fmt::{Debug, Formatter};
+use std::env;
 
 pub mod ownership;
 pub mod order;

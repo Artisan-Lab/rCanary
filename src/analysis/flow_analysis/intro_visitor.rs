@@ -1,5 +1,8 @@
-use std::ops::Add;
-use std::rc::Rc;
+use rustc_span::def_id::DefId;
+use rustc_middle::ty::{self, Ty, TyKind, TypeFoldable, TypeVisitable};
+use rustc_middle::mir::{Body, BasicBlock, BasicBlockData, Statement, StatementKind, Terminator, Place, Rvalue};
+use rustc_middle::mir::{Local, Operand, ProjectionElem, CastKind, TerminatorKind};
+use rustc_target::abi::VariantIdx;
 
 use crate::rlc_error;
 use crate::type_analysis::ownership::{OwnershipLayoutResult, RawTypeOwner};
@@ -9,13 +12,9 @@ use crate::flow_analysis::{IntroFlowAnalysis, FlowAnalysis, IcxSliceFroBlock, is
 use crate::flow_analysis::ownership::IntroVar;
 
 use colorful::{Color, Colorful};
-use z3::ast::{self, Ast, BV};
+use z3::ast::{self, Ast};
 
-use rustc_span::def_id::DefId;
-use rustc_middle::ty::{self, Ty, TyKind, TypeFoldable, TypeVisitable};
-use rustc_middle::mir::{Body, BasicBlock, BasicBlockData, Statement, StatementKind, Terminator, Place, Rvalue};
-use rustc_middle::mir::{Local, Operand, ProjectionElem, CastKind, TerminatorKind};
-use rustc_target::abi::VariantIdx;
+use std::ops::Add;
 
 // dereference
 // enum 强绑定 type + index
@@ -187,7 +186,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
 
                 // the bv and len is using to generate new constrain
                 // the ty is to check the consistency among the branches
-                let mut using_for_and_bv:Option<BV> = None;
+                let mut using_for_and_bv:Option<ast::BV> = None;
                 let mut ty = TyWithIndex::default();
                 let mut len = 0;
 
@@ -726,7 +725,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         }
 
         // extract the original z3 ast of the variable needed to prepare generating new
-        let l_ori_bv :BV;
+        let l_ori_bv: ast::BV;
         let r_ori_bv = self.icx_slice_mut().var_mut()[ru].extract();
 
         let mut is_ctor = true;
@@ -897,7 +896,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         }
 
         // extract the original z3 ast of the variable needed to prepare generating new
-        let l_ori_bv :BV;
+        let l_ori_bv: ast::BV;
         let r_ori_bv = self.icx_slice_mut().var_mut()[ru].extract();
 
         let mut is_ctor = true;
@@ -1062,7 +1061,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         }
 
         // extract the original z3 ast of the variable needed to prepare generating new
-        let l_ori_bv:BV;
+        let l_ori_bv: ast::BV;
         let r_ori_bv = self.icx_slice_mut().var_mut()[ru].extract();
 
         if self.icx_slice().var()[lu].is_init() {
@@ -1222,7 +1221,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         }
 
         // extract the original z3 ast of the variable needed to prepare generating new
-        let l_ori_bv:BV;
+        let l_ori_bv: ast::BV;
         let r_ori_bv = self.icx_slice_mut().var_mut()[ru].extract();
 
         if self.icx_slice().var()[lu].is_init() {
@@ -1380,7 +1379,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         }
 
         // extract the original z3 ast of the variable needed to prepare generating new
-        let l_ori_bv :BV;
+        let l_ori_bv: ast::BV;
         let r_ori_bv = self.icx_slice_mut().var_mut()[ru].extract();
 
         if self.icx_slice().var()[lu].is_init() {
@@ -1558,7 +1557,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         }
 
         // extract the original z3 ast of the variable needed to prepare generating new
-        let l_ori_bv :BV;
+        let l_ori_bv: ast::BV;
         let r_ori_bv = self.icx_slice_mut().var_mut()[ru].extract();
 
         if self.icx_slice().var()[lu].is_init() {

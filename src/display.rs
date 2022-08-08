@@ -1,11 +1,10 @@
-use std::env;
-
 use rustc_middle::mir::terminator::Terminator;
 use rustc_middle::mir::TerminatorKind;
 use rustc_middle::mir::{Operand, Rvalue, Statement, StatementKind, BasicBlock, BasicBlockData, Body, LocalDecl, LocalDecls};
 use rustc_middle::ty::{self, TyKind};
 use rustc_index::vec::IndexVec;
 
+use std::env;
 
 // In this crate we will costume the display information for Compiler-Metadata by implementing
 // rlc::Display for target data structure.

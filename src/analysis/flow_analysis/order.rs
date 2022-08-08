@@ -1,9 +1,9 @@
-use std::collections::BinaryHeap;
-
 use rustc_middle::mir::TerminatorKind;
 
 use crate::flow_analysis::{FlowAnalysis, NodeOrder};
 use crate::type_analysis::type_visitor::mir_body;
+
+use std::collections::BinaryHeap;
 
 impl<'tcx, 'a> FlowAnalysis<'tcx, 'a>{
     pub fn order(&mut self) {
