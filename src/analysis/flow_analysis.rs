@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::env;
 
-use rustc_middle::ty::{TyCtxt, Ty, TyKind};
+use rustc_middle::ty::TyCtxt;
 use rustc_span::def_id::DefId;
 use rustc_middle::mir::Body;
 use crate::flow_analysis::ownership::{IntroVar, Taint};
@@ -131,7 +131,7 @@ pub struct NodeOrder<'tcx> {
 }
 
 impl<'tcx> NodeOrder<'tcx> {
-    pub fn new(body: &'tcx Body) -> Self {
+    pub fn new(body: &'tcx Body<'tcx>) -> Self {
         let len = body.basic_blocks().len();
         Self {
             body,
@@ -587,21 +587,4 @@ pub fn is_icx_slice_verbose() -> bool {
         Some(_)  => true,
         _ => false,
     }
-}
-
-fn test_solving_for_model() {
-    use z3::*;
-    use z3::ast::*;
-
-    let cfg = Config::new();
-    let ctx = Context::new(&cfg);
-    let solver = Solver::new(&ctx);
-    let set = ast::Set::new_const(&ctx, "integer_set", &Sort::int(&ctx));
-    let one = ast::Int::from_u64(&ctx, 1);
-
-    solver.assert(&set._eq(&ast::Set::empty(&ctx, &Sort::int(&ctx)).add(&one)));
-    solver.assert(&set.member(&one));
-    drop(one);
-    assert_eq!(solver.check(), SatResult::Sat);
-
 }

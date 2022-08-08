@@ -1,9 +1,7 @@
-use rustc_middle::ty::{self, Ty, TyCtxt, TyKind, TypeVisitor, TypeFoldable};
+use rustc_middle::ty::{self, Ty, TyCtxt, TyKind, TypeVisitor, TypeFoldable, TypeVisitable, TypeSuperVisitable};
 use rustc_middle::ty::subst::GenericArgKind;
 use rustc_middle::mir::visit::{Visitor, TyContext};
-use rustc_middle::mir::{Body, BasicBlock, BasicBlockData, Local, LocalDecl, Operand};
-use rustc_middle::mir::terminator::TerminatorKind;
-use rustc_middle::mir::tcx::PlaceTy;
+use rustc_middle::mir::{Body, BasicBlock, BasicBlockData, Local, LocalDecl, Operand, TerminatorKind};
 use rustc_span::def_id::DefId;
 use rustc_target::abi::VariantIdx;
 
@@ -13,7 +11,6 @@ use std::ops::ControlFlow;
 use colorful::{Color, Colorful};
 
 use crate::display::{self, Display};
-use crate::rlc_error;
 use crate::type_analysis::{self, TypeAnalysis, OwnerPropagation, RawGeneric, RawGenericFieldSubst, RawGenericPropagation, RawTypeOwner, DefaultOwnership};
 use crate::type_analysis::ownership::RawTypeOwner::Owned;
 
@@ -596,7 +593,7 @@ impl<'tcx, 'a> TypeVisitor<'tcx> for DefaultOwnership<'tcx, 'a>   {
                     },
                     RawTypeOwner::Unowned => {
                         for (index, each_generic) in generic_list.iter().enumerate() {
-                            if *each_generic {
+                            if *each_generic == false {
                                 continue;
                             } else {
                                 let subset_ty = substs[index].expect_ty();
@@ -618,7 +615,7 @@ impl<'tcx, 'a> TypeVisitor<'tcx> for DefaultOwnership<'tcx, 'a>   {
             TyKind::Tuple( .. ) => {
                 ty.super_visit_with(self)
             },
-            TyKind::Param(param_ty) => {
+            TyKind::Param( .. ) => {
                 self.set_param(true);
                 self.set_res(RawTypeOwner::Owned);
 
@@ -641,35 +638,55 @@ impl<'tcx, 'a> TypeVisitor<'tcx> for DefaultOwnership<'tcx, 'a>   {
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Default)]
-pub struct TyWithIndex<'tcx>(pub Option<(usize, &'tcx TyKind<'tcx>, Option<usize>)>);
+pub struct TyWithIndex<'tcx>(pub Option<(usize, &'tcx TyKind<'tcx>, Option<usize>, bool)>);
 
-pub fn extract_layout_len_and_ty<'tcx>(ty: Ty<'tcx>, vidx: Option<VariantIdx>) -> TyWithIndex<'tcx> {
-    match &ty.kind() {
-        TyKind::Tuple( list ) => {
-            TyWithIndex(Some((list.len(), &ty.kind(), None)))
-        },
-        TyKind::Array( .. ) => {
-            TyWithIndex(Some((1, &ty.kind(), None)))
-        },
-        TyKind::Param( .. ) => {
-            TyWithIndex(Some((1, &ty.kind(), None)))
-        },
-        TyKind::Adt(adtdef, ..) => {
-            if adtdef.is_enum() {
-                let idx = vidx.unwrap();
-                let len = adtdef.variants()[idx].fields.len();
-                TyWithIndex(Some((len, &ty.kind(), Some(idx.index()))))
-            } else {
-                let len = adtdef.variants()[VariantIdx::from_usize(0)].fields.len();
-                TyWithIndex(Some((len, &ty.kind(), None)))
+impl<'tcx> TyWithIndex<'tcx> {
+    pub fn new(ty: Ty<'tcx>, vidx: Option<VariantIdx>) -> Self {
+        match &ty.kind() {
+            TyKind::Tuple( list ) => {
+                TyWithIndex(Some((list.len(), &ty.kind(), None, true)))
+            },
+            TyKind::Adt(adtdef, ..) => {
+                if adtdef.is_enum() {
+                    if vidx.is_none() { return TyWithIndex(None); }
+                    let idx = vidx.unwrap();
+                    let len = adtdef.variants()[idx].fields.len();
+                    TyWithIndex(Some((len, &ty.kind(), Some(idx.index()), true)))
+                } else {
+                    let len = adtdef.variants()[VariantIdx::from_usize(0)].fields.len();
+                    TyWithIndex(Some((len, &ty.kind(), None, true)))
+                }
+            },
+            TyKind::Array( .. )
+            | TyKind::Param( .. )
+            | TyKind::RawPtr( .. )
+            | TyKind::Ref( .. ) => {
+                TyWithIndex(Some((1, &ty.kind(), None, true)))
+            },
+            TyKind::Bool
+            | TyKind::Char
+            | TyKind::Int( .. )
+            | TyKind::Uint( .. )
+            | TyKind::Float( .. )
+            | TyKind::Str
+            | TyKind::Slice( .. ) => {
+                TyWithIndex(Some((1, &ty.kind(), None, false)))
+            },
+            _ => TyWithIndex(None),
+        }
+    }
+
+    // 0->unsupported, 1->trivial, 2-> needed
+    pub fn get_priority(&self) -> usize {
+        if self.0.is_none() { return 0; }
+        match self.0.unwrap().0 {
+            0 => 1,
+            _ => {
+                match self.0.unwrap().3 {
+                    true => 2,
+                    false => 1,
+                }
             }
-        },
-        TyKind::RawPtr( .. ) => {
-            TyWithIndex(Some((1, &ty.kind(), None)))
-        },
-        TyKind::Ref( .. ) => {
-            TyWithIndex(Some((1, &ty.kind(), None)))
-        },
-        _ => TyWithIndex(None),
+        }
     }
 }

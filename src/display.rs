@@ -1,6 +1,7 @@
 use std::env;
 
-use rustc_middle::mir::terminator::{Terminator, TerminatorKind};
+use rustc_middle::mir::terminator::Terminator;
+use rustc_middle::mir::TerminatorKind;
 use rustc_middle::mir::{Operand, Rvalue, Statement, StatementKind, BasicBlock, BasicBlockData, Body, LocalDecl, LocalDecls};
 use rustc_middle::ty::{self, TyKind};
 use rustc_index::vec::IndexVec;
@@ -134,6 +135,8 @@ impl<'tcx> Display for StatementKind<'tcx> {
                     s += "FakeRead",
                 StatementKind::SetDiscriminant { .. } =>
                     s += "SetDiscriminant",
+                StatementKind::Deinit( .. ) =>
+                    s += "Deinit",
                 StatementKind::StorageLive( .. ) =>
                     s += "StorageLive",
                 StatementKind::StorageDead( .. ) =>
@@ -189,6 +192,8 @@ impl<'tcx> Display for Rvalue<'tcx> {
                     s += "Rvalue Aggregate",
                 Rvalue::ShallowInitBox( .. ) =>
                     s+= "Rvalue ShallowInitBox",
+                Rvalue::CopyForDeref( .. ) =>
+                    s+= "Rvalue CopyForDeref",
             }
         } else {
             ()

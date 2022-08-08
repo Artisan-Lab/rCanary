@@ -1,23 +1,26 @@
-use std::fmt::format;
 use std::ops::Add;
+use std::rc::Rc;
 
-use crate::{rlc_error, rlc_info};
+use crate::rlc_error;
 use crate::type_analysis::ownership::{OwnershipLayoutResult, RawTypeOwner};
-use crate::type_analysis::type_visitor::{extract_layout_len_and_ty, mir_body, TyWithIndex};
+use crate::type_analysis::type_visitor::{mir_body, TyWithIndex};
 use crate::type_analysis::{DefaultOwnership, OwnershipLayout, RustBV, Unique};
 use crate::flow_analysis::{IntroFlowAnalysis, FlowAnalysis, IcxSliceFroBlock, is_z3_goal_verbose, is_icx_slice_verbose};
-use crate::flow_analysis::ownership::{IntroVar, Taint};
-use crate::display::Display;
+use crate::flow_analysis::ownership::IntroVar;
 
 use colorful::{Color, Colorful};
-use z3::ast::{self, Ast, Bool, BV};
+use z3::ast::{self, Ast, BV};
 
 use rustc_span::def_id::DefId;
-use rustc_middle::ty::{self, Ty, TyKind, TypeFoldable};
+use rustc_middle::ty::{self, Ty, TyKind, TypeFoldable, TypeVisitable};
 use rustc_middle::mir::{Body, BasicBlock, BasicBlockData, Statement, StatementKind, Terminator, Place, Rvalue};
-use rustc_middle::mir::{Local, Operand, ProjectionElem, CastKind};
-use rustc_middle::mir::terminator::TerminatorKind;
+use rustc_middle::mir::{Local, Operand, ProjectionElem, CastKind, TerminatorKind};
 use rustc_target::abi::VariantIdx;
+
+// dereference
+// enum 强绑定 type + index
+// multi-thread
+// 循环迭代一次
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum AsgnKind {
@@ -38,7 +41,7 @@ impl<'tcx, 'a> FlowAnalysis<'tcx, 'a>{
             let body = mir_body(tcx, def_id);
 
             // for loop free function analysis
-            if body.is_cfg_cyclic() { continue; }
+            if body.basic_blocks.is_cfg_cyclic() { continue; }
 
             let mut cfg = z3::Config::new();
             cfg.set_model_generation(true);
@@ -65,7 +68,7 @@ impl<'tcx, 'a> FlowAnalysis<'tcx, 'a>{
 
             let mut intro = IntroFlowAnalysis::new(self.rcx, def_id, &mut unique);
 
-            intro.visit_body(&ctx, &goal,&solver, def_id, body);
+            intro.visit_body(&ctx, &goal,&solver, body);
         }
     }
 }
@@ -85,7 +88,6 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         ctx: &'ctx z3::Context,
         goal: &'ctx z3::Goal<'ctx>,
         solver: &'ctx z3::Solver<'ctx>,
-        did: DefId,
         body: &Body<'tcx>,
     ) {
         let topo:Vec<usize> = self.graph().get_topo().iter().map(|id| *id).collect();
@@ -94,8 +96,6 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
             let data = &body.basic_blocks()[BasicBlock::from(bidx)];
             self.visit_block_data(ctx, goal, solver, data, bidx);
         }
-
-        let result = solver.check();
 
     }
 
@@ -136,7 +136,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
 
                 let ty = self.body().local_decls[Local::from_usize(idx)].ty;
 
-                let ty_with_index = extract_layout_len_and_ty(ty, None);
+                let ty_with_index = TyWithIndex::new(ty, None);
                 if ty_with_index == TyWithIndex(None) {
                     self.handle_intro_var_unsupported(idx);
                     continue;
@@ -315,8 +315,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
                 self.handle_drop(ctx, goal, solver, place, bidx, false);
             },
             TerminatorKind::Call { func, args, destination, .. } => {
-                let dest = destination.unwrap().0;
-                self.handle_call(ctx, goal, solver, &func, &args, &dest, bidx);
+                self.handle_call(ctx, goal, solver, &func, &args, &destination, bidx);
             },
             TerminatorKind::Return => {
                 self.handle_return(ctx, goal, solver, bidx);
@@ -367,7 +366,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
                     _ => (),
                 }
             },
-            Rvalue::Ref(.., borrow_kind, rplace) => {
+            Rvalue::Ref(.., rplace) => {
                 let kind = AsgnKind::Reference;
                 let rvalue_has_projection = has_projection(rplace);
                 match (lvalue_has_projection, rvalue_has_projection) {
@@ -377,7 +376,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
                     (false, false) => { self.handle_copy(ctx, goal, solver, kind, lplace, rplace, bidx, sidx); },
                 }
             },
-            Rvalue::AddressOf(mutability, rplace) => {
+            Rvalue::AddressOf(.., rplace) => {
                 let kind = AsgnKind::Reference;
                 let rvalue_has_projection = has_projection(rplace);
                 match (lvalue_has_projection, rvalue_has_projection) {
@@ -427,7 +426,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         ctx: &'ctx z3::Context,
         goal: &'ctx z3::Goal<'ctx>,
         solver: &'ctx z3::Solver<'ctx>,
-        kind: AsgnKind,
+        _kind: AsgnKind,
         lplace: &Place<'tcx>,
         rplace: &Place<'tcx>,
         bidx: usize,
@@ -481,17 +480,24 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         } else {
             // this branch means that the assignment is the constructor of the lvalue
             let r_place_ty = rplace.ty(&self.body().local_decls, self.tcx());
-            let ty_with_vidx = extract_layout_len_and_ty(r_place_ty.ty, r_place_ty.variant_index);
-            if ty_with_vidx.0.is_some() {
-                // update the layout of lvalue due to it is an instance
-                self.icx_slice_mut().ty_mut()[lu] = self.icx_slice().ty()[ru].clone();
-                self.icx_slice_mut().layout_mut()[lu] = self.icx_slice().layout()[ru].clone();
-            } else {
-                // cannot identify the ty (unsupported like fn ptr ...)
-                self.handle_intro_var_unsupported(lu);
-                self.handle_intro_var_unsupported(ru);
-                return;
-            };
+            let ty_with_vidx = TyWithIndex::new(r_place_ty.ty, r_place_ty.variant_index);
+            match ty_with_vidx.get_priority() {
+                0 => {
+                    // cannot identify the ty (unsupported like fn ptr ...)
+                    self.handle_intro_var_unsupported(lu);
+                    self.handle_intro_var_unsupported(ru);
+                    return;
+                },
+                1 => {
+                    return;
+                },
+                2 => {
+                    // update the layout of lvalue due to it is an instance
+                    self.icx_slice_mut().ty_mut()[lu] = self.icx_slice().ty()[ru].clone();
+                    self.icx_slice_mut().layout_mut()[lu] = self.icx_slice().layout()[ru].clone();
+                },
+                _ => unreachable!(),
+            }
         }
 
         // update the lvalue length that is equal to rvalue
@@ -547,7 +553,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         ctx: &'ctx z3::Context,
         goal: &'ctx z3::Goal<'ctx>,
         solver: &'ctx z3::Solver<'ctx>,
-        kind: AsgnKind,
+        _kind: AsgnKind,
         lplace: &Place<'tcx>,
         rplace: &Place<'tcx>,
         bidx: usize,
@@ -601,17 +607,24 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         } else {
             // this branch means that the assignment is the constructor of the lvalue
             let r_place_ty = rplace.ty(&self.body().local_decls, self.tcx());
-            let ty_with_vidx = extract_layout_len_and_ty(r_place_ty.ty, r_place_ty.variant_index);
-            if ty_with_vidx.0.is_some() {
-                // update the layout of lvalue due to it is an instance
-                self.icx_slice_mut().ty_mut()[lu] = self.icx_slice().ty()[ru].clone();
-                self.icx_slice_mut().layout_mut()[lu] = self.icx_slice().layout()[ru].clone();
-            } else {
-                // cannot identify the ty (unsupported like fn ptr ...)
-                self.handle_intro_var_unsupported(lu);
-                self.handle_intro_var_unsupported(ru);
-                return;
-            };
+            let ty_with_vidx = TyWithIndex::new(r_place_ty.ty, r_place_ty.variant_index);
+            match ty_with_vidx.get_priority() {
+                0 => {
+                    // cannot identify the ty (unsupported like fn ptr ...)
+                    self.handle_intro_var_unsupported(lu);
+                    self.handle_intro_var_unsupported(ru);
+                    return;
+                },
+                1 => {
+                    return;
+                },
+                2 => {
+                    // update the layout of lvalue due to it is an instance
+                    self.icx_slice_mut().ty_mut()[lu] = self.icx_slice().ty()[ru].clone();
+                    self.icx_slice_mut().layout_mut()[lu] = self.icx_slice().layout()[ru].clone();
+                },
+                _ => unreachable!(),
+            }
         }
 
         // update the lvalue length that is equal to rvalue
@@ -630,7 +643,6 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         let l_new_bv = ast::BV::new_const(ctx, l_name, llen as u32);
         let r_new_bv = ast::BV::new_const(ctx, r_name, rlen as u32);
 
-        let l_zero_const = ast::BV::from_u64(ctx, 0, llen as u32);
         let r_zero_const = ast::BV::from_u64(ctx, 0, rlen as u32);
 
         // the constraint that promise the unique ownership in transformation of y=move x, l=move r
@@ -657,7 +669,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         ctx: &'ctx z3::Context,
         goal: &'ctx z3::Goal<'ctx>,
         solver: &'ctx z3::Solver<'ctx>,
-        kind: AsgnKind,
+        _kind: AsgnKind,
         lplace: &Place<'tcx>,
         rplace: &Place<'tcx>,
         bidx: usize,
@@ -732,17 +744,24 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
             // this branch means that the assignment is the constructor of the lvalue
             // Note : l = r.f => l's len must be 1 if l is a pointer
             let r_place_ty = rplace.ty(&self.body().local_decls, self.tcx());
-            let ty_with_vidx = extract_layout_len_and_ty(r_place_ty.ty, r_place_ty.variant_index);
-            if ty_with_vidx.0.is_some() {
-                // update the layout of lvalue due to it is an instance
-                self.icx_slice_mut().ty_mut()[lu] = ty_with_vidx;
-                self.icx_slice_mut().layout_mut()[lu] = default_ownership.layout().clone();
-            } else {
-                // cannot identify the ty (unsupported like fn ptr ...)
-                self.handle_intro_var_unsupported(lu);
-                self.handle_intro_var_unsupported(ru);
-                return;
-            };
+            let ty_with_vidx = TyWithIndex::new(r_place_ty.ty, r_place_ty.variant_index);
+            match ty_with_vidx.get_priority() {
+                0 => {
+                    // cannot identify the ty (unsupported like fn ptr ...)
+                    self.handle_intro_var_unsupported(lu);
+                    self.handle_intro_var_unsupported(ru);
+                    return;
+                },
+                1 => {
+                    return;
+                },
+                2 => {
+                    // update the layout of lvalue due to it is an instance
+                    self.icx_slice_mut().ty_mut()[lu] = ty_with_vidx;
+                    self.icx_slice_mut().layout_mut()[lu] = default_ownership.layout().clone();
+                },
+                _ => unreachable!(),
+            }
         }
 
         // update the lvalue length that is equal to rvalue
@@ -764,10 +783,10 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         // the constraint that promise the unique ownership in transformation of y=x.f, l=r.f
         // the exactly constraint is that ( r.f'=r.f && l'=0 ) || ( l'=extend(r.f) && r.f'=0 )
         // this is for r.f'=r.f (no change) && l'=0
-        let r_f_owing = r_new_bv._safe_eq(&r_ori_bv).unwrap();
+        let r_f_owning = r_new_bv._safe_eq(&r_ori_bv).unwrap();
         let l_zero_const = ast::BV::from_u64(ctx, 0, llen as u32);
         let l_non_owning = l_new_bv._safe_eq(&l_zero_const).unwrap();
-        let args1 = &[&r_f_owing, &l_non_owning];
+        let args1 = &[&r_f_owning, &l_non_owning];
         let summary_1 = ast::Bool::and(ctx, args1);
 
         // this is for l'=extend(r.f) && r.f'=0
@@ -786,7 +805,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         let int_for_op_and = rustbv_to_int(&rust_bv_for_op_and);
         let z3_bv_for_op_and = ast::BV::from_u64(ctx, int_for_op_and, llen as u32);
         let extract_from_field = r_ori_bv.extract(index_needed as u32, index_needed as u32);
-        let repeat_field = if llen-1>0 { extract_from_field } else { extract_from_field.sign_ext((llen-1) as u32) };
+        let repeat_field = if llen>1 { extract_from_field.sign_ext((llen-1) as u32) } else { extract_from_field };
         let after_op_and = z3_bv_for_op_and.bvand(&repeat_field);
         let l_extend_owning = l_new_bv._safe_eq(&after_op_and).unwrap();
         // this is for r.f'=0
@@ -821,7 +840,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         ctx: &'ctx z3::Context,
         goal: &'ctx z3::Goal<'ctx>,
         solver: &'ctx z3::Solver<'ctx>,
-        kind: AsgnKind,
+        _kind: AsgnKind,
         lplace: &Place<'tcx>,
         rplace: &Place<'tcx>,
         bidx: usize,
@@ -860,7 +879,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         }
         let index_needed = rpj_fields[0].0;
 
-        let mut default_ownership = self.extract_default_ty_layout(rpj_ty.ty, rpj_ty.variant_index);
+        let default_ownership = self.extract_default_ty_layout(rpj_ty.ty, rpj_ty.variant_index);
         if !default_ownership.get_requirement() || default_ownership.is_empty() {
             return;
         }
@@ -902,17 +921,24 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
             // this branch means that the assignment is the constructor of the lvalue
             // Note : l = r.f => l's len must be 1 if l is a pointer
             let r_place_ty = rplace.ty(&self.body().local_decls, self.tcx());
-            let ty_with_vidx = extract_layout_len_and_ty(r_place_ty.ty, r_place_ty.variant_index);
-            if ty_with_vidx.0.is_some() {
-                // update the layout of lvalue due to it is an instance
-                self.icx_slice_mut().ty_mut()[lu] = ty_with_vidx;
-                self.icx_slice_mut().layout_mut()[lu] = default_ownership.layout().clone();
-            } else {
-                // cannot identify the ty (unsupported like fn ptr ...)
-                self.handle_intro_var_unsupported(lu);
-                self.handle_intro_var_unsupported(ru);
-                return;
-            };
+            let ty_with_vidx = TyWithIndex::new(r_place_ty.ty, r_place_ty.variant_index);
+            match ty_with_vidx.get_priority() {
+                0 => {
+                    // cannot identify the ty (unsupported like fn ptr ...)
+                    self.handle_intro_var_unsupported(lu);
+                    self.handle_intro_var_unsupported(ru);
+                    return;
+                },
+                1 => {
+                    return;
+                },
+                2 => {
+                    // update the layout of lvalue due to it is an instance
+                    self.icx_slice_mut().ty_mut()[lu] = ty_with_vidx;
+                    self.icx_slice_mut().layout_mut()[lu] = default_ownership.layout().clone();
+                },
+                _ => unreachable!(),
+            }
         }
 
         // update the lvalue length that is equal to rvalue
@@ -948,7 +974,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         let int_for_op_and = rustbv_to_int(&rust_bv_for_op_and);
         let z3_bv_for_op_and = ast::BV::from_u64(ctx, int_for_op_and, llen as u32);
         let extract_from_field = r_ori_bv.extract(index_needed as u32, index_needed as u32);
-        let repeat_field = if llen-1>0 { extract_from_field } else { extract_from_field.sign_ext((llen-1) as u32) };
+        let repeat_field = if llen>1 { extract_from_field.sign_ext((llen-1) as u32) } else { extract_from_field };
         let after_op_and = z3_bv_for_op_and.bvand(&repeat_field);
         let l_extend_owning = l_new_bv._safe_eq(&after_op_and).unwrap();
 
@@ -979,7 +1005,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         ctx: &'ctx z3::Context,
         goal: &'ctx z3::Goal<'ctx>,
         solver: &'ctx z3::Solver<'ctx>,
-        kind: AsgnKind,
+        _kind: AsgnKind,
         lplace: &Place<'tcx>,
         rplace: &Place<'tcx>,
         bidx: usize,
@@ -1024,7 +1050,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         }
 
         // get the length of current variable and the lplace projection to generate bit vector in the future
-        let mut llen = default_ownership.layout().len();
+        let llen = default_ownership.layout().len();
         self.icx_slice_mut().len_mut()[lu] = llen;
         let rlen = self.icx_slice().len()[ru];
 
@@ -1042,8 +1068,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         if self.icx_slice().var()[lu].is_init() {
             // if the lvalue is not initialized for the first time
             // the constraint that promise the original value of lvalue that does not hold the ownership
-            // e.g., y= x.f ,that y (l) is non-owning
-
+            // e.g., y.f= x ,that y.f (l) is non-owning
             l_ori_bv = self.icx_slice_mut().var_mut()[lu].extract();
             let extract_from_field = l_ori_bv.extract(index_needed as u32, index_needed as u32);
             let l_f_zero_const = ast::BV::from_u64(ctx, 0, 1);
@@ -1060,8 +1085,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
             goal.assert(&constraint_l_ctor_zero);
             solver.assert(&constraint_l_ctor_zero);
             l_ori_bv = l_ori_zero;
-            let l_place_ty = lplace.ty(&self.body().local_decls, self.tcx());
-            self.icx_slice_mut().ty_mut()[lu] = extract_layout_len_and_ty(l_local_ty, None);
+            self.icx_slice_mut().ty_mut()[lu] = TyWithIndex::new(l_local_ty, None);
             self.icx_slice_mut().layout_mut()[lu] = default_ownership.layout().clone();
         }
 
@@ -1141,7 +1165,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         ctx: &'ctx z3::Context,
         goal: &'ctx z3::Goal<'ctx>,
         solver: &'ctx z3::Solver<'ctx>,
-        kind: AsgnKind,
+        _kind: AsgnKind,
         lplace: &Place<'tcx>,
         rplace: &Place<'tcx>,
         bidx: usize,
@@ -1186,7 +1210,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         }
 
         // get the length of current variable and the lplace projection to generate bit vector in the future
-        let mut llen = default_ownership.layout().len();
+        let llen = default_ownership.layout().len();
         self.icx_slice_mut().len_mut()[lu] = llen;
         let rlen = self.icx_slice().len()[ru];
 
@@ -1205,7 +1229,6 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
             // if the lvalue is not initialized for the first time
             // the constraint that promise the original value of lvalue that does not hold the ownership
             // e.g., y.f=move x ,that y.f (l) is non-owning
-
             l_ori_bv = self.icx_slice_mut().var_mut()[lu].extract();
             let extract_from_field = l_ori_bv.extract(index_needed as u32, index_needed as u32);
             let l_f_zero_const = ast::BV::from_u64(ctx, 0, 1);
@@ -1222,8 +1245,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
             goal.assert(&constraint_l_ctor_zero);
             solver.assert(&constraint_l_ctor_zero);
             l_ori_bv = l_ori_zero;
-            let l_place_ty = lplace.ty(&self.body().local_decls, self.tcx());
-            self.icx_slice_mut().ty_mut()[lu] = extract_layout_len_and_ty(l_local_ty, None);
+            self.icx_slice_mut().ty_mut()[lu] = TyWithIndex::new(l_local_ty, None);
             self.icx_slice_mut().layout_mut()[lu] = default_ownership.layout_mut().clone();
         }
 
@@ -1282,12 +1304,176 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         ctx: &'ctx z3::Context,
         goal: &'ctx z3::Goal<'ctx>,
         solver: &'ctx z3::Solver<'ctx>,
-        kind: AsgnKind,
-        lplace: &Place,
-        rplace: &Place,
+        _kind: AsgnKind,
+        lplace: &Place<'tcx>,
+        rplace: &Place<'tcx>,
         bidx: usize,
         sidx: usize
     ) {
+        // y.f= x.f => l.f= r.f
+        let llocal = lplace.local;
+        let rlocal = rplace.local;
+
+        let lu:usize = llocal.as_usize();
+        let ru:usize = rlocal.as_usize();
+
+        // if the current layout of the father in rvalue is 0, avoid the following analysis
+        // e.g., a = b, b:[]
+        if self.icx_slice().len[ru] == 0 {
+            // the len is 0 and ty is None which do not need update
+            return;
+        }
+
+        let l_local_ty = self.body().local_decls[llocal].ty;
+
+        // extract the ty of the rplace, the rplace has projection like _1.0
+        // rpj ty is the exact ty of rplace, the first field ty of rplace
+        let rpj_ty = rplace.ty(&self.body().local_decls, self.tcx());
+        let rpj_fields = match extract_projection_field(rplace) {
+            Some(f) => f,
+            None => {
+                // exit when extract field failed due to operation is not locating to one Field
+                return;
+            },
+        };
+        if rpj_fields.len() > 1 {
+            // we only support that the field depth is 1 in max
+            self.handle_intro_var_unsupported(lu);
+            self.handle_intro_var_unsupported(ru);
+            return;
+        }
+        let r_index_needed = rpj_fields[0].0;
+
+        // extract the ty of the lplace, the lplace has projection like _1.0
+        // lpj ty is the exact ty of lplace, the first field ty of lplace
+        let lpj_ty = lplace.ty(&self.body().local_decls, self.tcx());
+        let lpj_fields = match extract_projection_field(lplace) {
+            Some(f) => f,
+            None => {
+                // exit when extract field failed due to operation is not locating to one Field
+                return;
+            },
+        };
+        if lpj_fields.len() > 1 {
+            // we only support that the field depth is 1 in max
+            self.handle_intro_var_unsupported(lu);
+            self.handle_intro_var_unsupported(ru);
+            return;
+        }
+        let l_index_needed = lpj_fields[0].0;
+
+        let default_ownership = self.extract_default_ty_layout(l_local_ty, None);
+        if !default_ownership.get_requirement() || default_ownership.is_empty() {
+            return;
+        }
+
+        // get the length of current variable and the rplace projection to generate bit vector in the future
+        let llen = default_ownership.layout().len();
+        let rlen = self.icx_slice().len()[ru];
+        self.icx_slice_mut().len_mut()[lu] = llen;
+
+        // if any rvalue or lplace is unsupported, then make them all unsupported and exit
+        if self.icx_slice().var()[lu].is_unsupported() || self.icx_slice.var()[ru].is_unsupported() {
+            self.handle_intro_var_unsupported(lu);
+            self.handle_intro_var_unsupported(ru);
+            return;
+        }
+
+        // extract the original z3 ast of the variable needed to prepare generating new
+        let l_ori_bv :BV;
+        let r_ori_bv = self.icx_slice_mut().var_mut()[ru].extract();
+
+        if self.icx_slice().var()[lu].is_init() {
+            // if the lvalue is not initialized for the first time
+            // the constraint that promise the original value of lvalue that does not hold the ownership
+            // e.g., y.f= move x.f ,that y.f (l) is non-owning
+            l_ori_bv = self.icx_slice_mut().var_mut()[lu].extract();
+            let extract_from_field = l_ori_bv.extract(l_index_needed as u32, l_index_needed as u32);
+            let l_f_zero_const = ast::BV::from_u64(ctx, 0, 1);
+            let constraint_l_f_ori_zero = extract_from_field._safe_eq(&l_f_zero_const).unwrap();
+            goal.assert(&constraint_l_f_ori_zero);
+            solver.assert(&constraint_l_f_ori_zero);
+        } else {
+            // this branch means that the assignment is the constructor of the lvalue (either l and l.f)
+            // this constraint promise before the struct is [0;field]
+            let l_ori_name_ctor = new_local_name(lu, bidx, sidx).add("_ctor_asgn");
+            let l_ori_bv_ctor = ast::BV::new_const(ctx, l_ori_name_ctor, llen as u32);
+            let l_ori_zero = ast::BV::from_u64(ctx, 0, llen as u32);
+            let constraint_l_ctor_zero = l_ori_bv_ctor._safe_eq(&l_ori_zero).unwrap();
+            goal.assert(&constraint_l_ctor_zero);
+            solver.assert(&constraint_l_ctor_zero);
+            l_ori_bv = l_ori_zero;
+            self.icx_slice_mut().ty_mut()[lu] = TyWithIndex::new(l_local_ty, None);
+            self.icx_slice_mut().layout_mut()[lu] = default_ownership.layout().clone();
+        }
+
+        // produce the name of lvalue and rvalue in this program point
+        let l_name = new_local_name(lu, bidx, sidx);
+        let r_name = new_local_name(ru, bidx, sidx);
+
+        // generate new bit vectors for variables
+        let l_new_bv = ast::BV::new_const(ctx, l_name, llen as u32);
+        let r_new_bv = ast::BV::new_const(ctx, r_name, rlen as u32);
+
+        // the constraint that promise the unique ownership in transformation of y.f= x.f, l.f= r.f
+        // the exactly constraint is that (r.f'=0 && l.f'=r.f) || (l.f'=0 && r.f'=r.f)
+        // this is for r.f'=0 && l.f'=r.f
+        // this is for r.f'=0
+        // like r.1'=0 => ori and new => [0110] and [1011] => [0010]
+        // note that we calculate the index of r.f and use bit vector 'and' to update the ownership
+        let mut rust_bv_for_op_and = vec![ true ; rlen ];
+        rust_bv_for_op_and[r_index_needed] = false;
+        let int_for_op_and = rustbv_to_int(&rust_bv_for_op_and);
+        let z3_bv_for_op_and = ast::BV::from_u64(ctx, int_for_op_and, rlen as u32);
+        let after_op_and = r_ori_bv.bvand(&z3_bv_for_op_and);
+        let rpj_non_owning = r_new_bv._safe_eq(&after_op_and).unwrap();
+        // this is for l.f'=r.f
+        // to achieve this goal would be kind of complicated
+        // first we extract the field from the rvalue into point as *
+        // then, the we contact 3 bit vector [1;begin] [*] [1;end]
+        let extract_field_r = r_ori_bv.extract(r_index_needed as u32, r_index_needed as u32);
+        let mut final_bv: ast::BV;
+        if l_index_needed < llen-1 {
+            let end_part = l_ori_bv.extract((llen-1) as u32, (l_index_needed+1) as u32);
+            final_bv = end_part.concat(&extract_field_r);
+        } else {
+            final_bv = extract_field_r;
+        }
+        if l_index_needed > 0 {
+            let begin_part = l_ori_bv.extract((l_index_needed-1) as u32, 0);
+            final_bv = final_bv.concat(&begin_part);
+        }
+        let lpj_owning = l_new_bv._safe_eq(&final_bv).unwrap();
+
+        let args1 = &[&rpj_non_owning, &lpj_owning];
+        let summary_1 = ast::Bool::and(ctx, args1);
+
+        // this is for l.f'=0 && r.f'=r.f
+        // this is for l.f'=0
+        let mut rust_bv_for_op_and = vec![ true ; llen ];
+        rust_bv_for_op_and[l_index_needed] = false;
+        let int_for_op_and = rustbv_to_int(&rust_bv_for_op_and);
+        let z3_bv_for_op_and =  ast::BV::from_u64(ctx, int_for_op_and, llen as u32);
+        let after_op_and = l_ori_bv.bvand(&z3_bv_for_op_and);
+        let lpj_non_owning = l_new_bv._safe_eq(&after_op_and).unwrap();
+        // this is for r.f'=r.f
+        let rpj_owning = r_new_bv._safe_eq(&r_ori_bv).unwrap();
+
+
+        let args2 = &[&lpj_non_owning, &rpj_owning];
+        let summary_2 = ast::Bool::and(ctx, args2);
+
+        // the final constraint and add the constraint to the goal of this function
+        let args3 = &[&summary_1, &summary_2];
+        let constraint_owning_now = ast::Bool::or(ctx, args3);
+
+        goal.assert(&constraint_owning_now);
+        solver.assert(&constraint_owning_now);
+
+        // update the intro var value in current basic block (exactly, the statement)
+        self.icx_slice_mut().var_mut()[lu] = IntroVar::Init(l_new_bv);
+        self.icx_slice_mut().var_mut()[ru] = IntroVar::Init(r_new_bv);
+        self.handle_taint(lu, ru);
 
     }
 
@@ -1296,12 +1482,157 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         ctx: &'ctx z3::Context,
         goal: &'ctx z3::Goal<'ctx>,
         solver: &'ctx z3::Solver<'ctx>,
-        kind: AsgnKind,
-        lplace: &Place,
-        rplace: &Place,
+        _kind: AsgnKind,
+        lplace: &Place<'tcx>,
+        rplace: &Place<'tcx>,
         bidx: usize,
         sidx: usize
     ) {
+        // y.f=move x.f => l.f=move r.f
+        let llocal = lplace.local;
+        let rlocal = rplace.local;
+
+        let lu:usize = llocal.as_usize();
+        let ru:usize = rlocal.as_usize();
+
+        // if the current layout of the father in rvalue is 0, avoid the following analysis
+        // e.g., a = b, b:[]
+        if self.icx_slice().len[ru] == 0 {
+            // the len is 0 and ty is None which do not need update
+            return;
+        }
+
+        let l_local_ty = self.body().local_decls[llocal].ty;
+
+        // extract the ty of the rplace, the rplace has projection like _1.0
+        // rpj ty is the exact ty of rplace, the first field ty of rplace
+        let rpj_ty = rplace.ty(&self.body().local_decls, self.tcx());
+        let rpj_fields = match extract_projection_field(rplace) {
+            Some(f) => f,
+            None => {
+                // exit when extract field failed due to operation is not locating to one Field
+                return;
+            },
+        };
+        if rpj_fields.len() > 1 {
+            // we only support that the field depth is 1 in max
+            self.handle_intro_var_unsupported(lu);
+            self.handle_intro_var_unsupported(ru);
+            return;
+        }
+        let r_index_needed = rpj_fields[0].0;
+
+        // extract the ty of the lplace, the lplace has projection like _1.0
+        // lpj ty is the exact ty of lplace, the first field ty of lplace
+        let lpj_ty = lplace.ty(&self.body().local_decls, self.tcx());
+        let lpj_fields = match extract_projection_field(lplace) {
+            Some(f) => f,
+            None => {
+                // exit when extract field failed due to operation is not locating to one Field
+                return;
+            },
+        };
+        if lpj_fields.len() > 1 {
+            // we only support that the field depth is 1 in max
+            self.handle_intro_var_unsupported(lu);
+            self.handle_intro_var_unsupported(ru);
+            return;
+        }
+        let l_index_needed = lpj_fields[0].0;
+
+        let default_ownership = self.extract_default_ty_layout(l_local_ty, None);
+        if !default_ownership.get_requirement() || default_ownership.is_empty() {
+            return;
+        }
+
+        // get the length of current variable and the rplace projection to generate bit vector in the future
+        let llen = default_ownership.layout().len();
+        let rlen = self.icx_slice().len()[ru];
+        self.icx_slice_mut().len_mut()[lu] = llen;
+
+        // if any rvalue or lplace is unsupported, then make them all unsupported and exit
+        if self.icx_slice().var()[lu].is_unsupported() || self.icx_slice.var()[ru].is_unsupported() {
+            self.handle_intro_var_unsupported(lu);
+            self.handle_intro_var_unsupported(ru);
+            return;
+        }
+
+        // extract the original z3 ast of the variable needed to prepare generating new
+        let l_ori_bv :BV;
+        let r_ori_bv = self.icx_slice_mut().var_mut()[ru].extract();
+
+        if self.icx_slice().var()[lu].is_init() {
+            // if the lvalue is not initialized for the first time
+            // the constraint that promise the original value of lvalue that does not hold the ownership
+            // e.g., y.f= move x.f ,that y.f (l) is non-owning
+            l_ori_bv = self.icx_slice_mut().var_mut()[lu].extract();
+            let extract_from_field = l_ori_bv.extract(l_index_needed as u32, l_index_needed as u32);
+            let l_f_zero_const = ast::BV::from_u64(ctx, 0, 1);
+            let constraint_l_f_ori_zero = extract_from_field._safe_eq(&l_f_zero_const).unwrap();
+            goal.assert(&constraint_l_f_ori_zero);
+            solver.assert(&constraint_l_f_ori_zero);
+        } else {
+            // this branch means that the assignment is the constructor of the lvalue (either l and l.f)
+            // this constraint promise before the struct is [0;field]
+            let l_ori_name_ctor = new_local_name(lu, bidx, sidx).add("_ctor_asgn");
+            let l_ori_bv_ctor = ast::BV::new_const(ctx, l_ori_name_ctor, llen as u32);
+            let l_ori_zero = ast::BV::from_u64(ctx, 0, llen as u32);
+            let constraint_l_ctor_zero = l_ori_bv_ctor._safe_eq(&l_ori_zero).unwrap();
+            goal.assert(&constraint_l_ctor_zero);
+            solver.assert(&constraint_l_ctor_zero);
+            l_ori_bv = l_ori_zero;
+            self.icx_slice_mut().ty_mut()[lu] = TyWithIndex::new(l_local_ty, None);
+            self.icx_slice_mut().layout_mut()[lu] = default_ownership.layout().clone();
+        }
+
+        // produce the name of lvalue and rvalue in this program point
+        let l_name = new_local_name(lu, bidx, sidx);
+        let r_name = new_local_name(ru, bidx, sidx);
+
+        // generate new bit vectors for variables
+        let l_new_bv = ast::BV::new_const(ctx, l_name, llen as u32);
+        let r_new_bv = ast::BV::new_const(ctx, r_name, rlen as u32);
+
+        // the constraint that promise the unique ownership in transformation of y.f=move x.f, l.f=move r.f
+        // the exactly constraint is that r.f'=0 && l.f'=r.f
+        // this is for r.f'=0
+        // like r.1'=0 => ori and new => [0110] and [1011] => [0010]
+        // note that we calculate the index of r.f and use bit vector 'and' to update the ownership
+        let mut rust_bv_for_op_and = vec![ true ; rlen ];
+        rust_bv_for_op_and[r_index_needed] = false;
+        let int_for_op_and = rustbv_to_int(&rust_bv_for_op_and);
+        let z3_bv_for_op_and = ast::BV::from_u64(ctx, int_for_op_and, rlen as u32);
+        let after_op_and = r_ori_bv.bvand(&z3_bv_for_op_and);
+        let rpj_non_owning = r_new_bv._safe_eq(&after_op_and).unwrap();
+
+        // this is for l.f'=r.f
+        // to achieve this goal would be kind of complicated
+        // first we extract the field from the rvalue into point as *
+        // then, the we contact 3 bit vector [1;begin] [*] [1;end]
+        let extract_field_r = r_ori_bv.extract(r_index_needed as u32, r_index_needed as u32);
+        let mut final_bv: ast::BV;
+
+        if l_index_needed < llen-1 {
+            let end_part = l_ori_bv.extract((llen-1) as u32, (l_index_needed+1) as u32);
+            final_bv = end_part.concat(&extract_field_r);
+        } else {
+            final_bv = extract_field_r;
+        }
+        if l_index_needed > 0 {
+            let begin_part = l_ori_bv.extract((l_index_needed-1) as u32, 0);
+            final_bv = final_bv.concat(&begin_part);
+        }
+        let lpj_owning = l_new_bv._safe_eq(&final_bv).unwrap();
+
+        goal.assert(&rpj_non_owning);
+        goal.assert(&lpj_owning);
+        solver.assert(&rpj_non_owning);
+        solver.assert(&lpj_owning);
+
+        // update the intro var value in current basic block (exactly, the statement)
+        self.icx_slice_mut().var_mut()[lu] = IntroVar::Init(l_new_bv);
+        self.icx_slice_mut().var_mut()[ru] = IntroVar::Init(r_new_bv);
+        self.handle_taint(lu, ru);
 
     }
 
@@ -1385,7 +1716,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         if !default_layout.get_requirement() || default_layout.is_empty() {
             return ans;
         }
-        let ty_with_idx = extract_layout_len_and_ty(l_place_ty.ty, l_place_ty.variant_index);
+        let ty_with_idx = TyWithIndex::new(l_place_ty.ty, l_place_ty.variant_index);
 
         for arg in args {
             match arg {
@@ -1486,7 +1817,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
 
                     if source_flag {
                         self.icx_slice_mut().taint_mut()[lu].insert(
-                            extract_layout_len_and_ty(
+                            TyWithIndex::new(
                                 a_place_ty.ty,
                                 a_place_ty.variant_index
                             )
@@ -1509,7 +1840,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
                                 let a_ori_non_owing = a_ori_bv._safe_eq(&a_zero_const).unwrap();
 
                                 // this is for a'=a
-                                let a_name = new_local_name(au, bidx, 0).add("param_pass");
+                                let a_name = new_local_name(au, bidx, 0).add("_param_pass");
                                 let a_new_bv = ast::BV::new_const(ctx, a_name, alen as u32);
                                 let update_a = a_new_bv._safe_eq(&a_ori_bv).unwrap();
 
@@ -1534,7 +1865,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
                                 // if the aplace in field is a pointer (move a.f (ptr) => still hold)
                                 // the exact constraint is a'=a
                                 // this is for a'=a
-                                let a_name = new_local_name(au, bidx, 0).add("param_pass");
+                                let a_name = new_local_name(au, bidx, 0).add("_param_pass");
                                 let a_new_bv = ast::BV::new_const(ctx, a_name, alen as u32);
                                 let update_a = a_new_bv._safe_eq(&a_ori_bv).unwrap();
 
@@ -1689,17 +2020,23 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
                     is_ctor = false;
                 } else {
                     // this branch means that the assignment is the constructor of the lvalue
-                    let ty_with_vidx = extract_layout_len_and_ty(l_place_ty.ty, l_place_ty.variant_index);
-
-                    if ty_with_vidx.0.is_some() {
-                        // update the layout of lvalue due to it is an instance
-                        self.icx_slice_mut().ty_mut()[lu] = ty_with_vidx;
-                        self.icx_slice_mut().layout_mut()[lu] = return_value_layout.layout().clone();
-                    } else {
-                        // cannot identify the ty (unsupported like fn ptr ...)
-                        self.handle_intro_var_unsupported(lu);
-                        return;
-                    };
+                    let ty_with_vidx = TyWithIndex::new(l_place_ty.ty, l_place_ty.variant_index);
+                    match ty_with_vidx.get_priority() {
+                        0 => {
+                            // cannot identify the ty (unsupported like fn ptr ...)
+                            self.handle_intro_var_unsupported(lu);
+                            return;
+                        },
+                        1 => {
+                            return;
+                        },
+                        2 => {
+                            // update the layout of lvalue due to it is an instance
+                            self.icx_slice_mut().ty_mut()[lu] = ty_with_vidx;
+                            self.icx_slice_mut().layout_mut()[lu] = return_value_layout.layout().clone();
+                        },
+                        _ => unreachable!(),
+                    }
                 }
 
                 llen = return_value_layout.layout().len();
@@ -1731,7 +2068,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
 
                 let int_for_gen = rustbv_to_int(&ownership_layout_to_rustbv(return_value_layout.layout()));
 
-                let mut llen = self.icx_slice().len()[lu];
+                let llen = self.icx_slice().len()[lu];
 
                 let lpj_fields = match extract_projection_field(dest) {
                     Some(f) => f,
@@ -1760,7 +2097,7 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
                     solver.assert(&constraint_l_ctor_zero);
 
                     l_ori_bv = l_ori_zero;
-                    self.icx_slice_mut().ty_mut()[lu] = extract_layout_len_and_ty(l_local_ty, None);
+                    self.icx_slice_mut().ty_mut()[lu] = TyWithIndex::new(l_local_ty, None);
                     self.icx_slice_mut().layout_mut()[lu] = return_value_layout.layout().clone();
                 }
 
@@ -1825,24 +2162,29 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
 
                 let zero_const = ast::BV::from_u64(ctx, 0, len as u32);
 
-                let constraint_var_update = var_return_bv._safe_eq(&var_ori_bv).unwrap();
-                let constraint_var_freed = var_return_bv._safe_eq(&zero_const).unwrap();
+                let var_update = var_return_bv._safe_eq(&var_ori_bv).unwrap();
+                let var_freed = var_return_bv._safe_eq(&zero_const).unwrap();
 
-                goal.assert(&constraint_var_update);
-                goal.assert(&constraint_var_freed);
-                solver.assert(&constraint_var_update);
-                solver.assert(&constraint_var_freed);
+                let args = &[&var_update, &var_freed];
+                let constraint_return = ast::Bool::and(ctx, args);
+
+                goal.assert(&constraint_return);
+                solver.assert(&constraint_return);
             }
         }
 
         let result = solver.check();
+        let model = solver.get_model();
 
         if is_z3_goal_verbose() {
             let g = format!("{}", goal);
-            println!("{}", g.color(Color::LightRed).bold());
-            println!("{:?}", result);
-            println!("{:?}", solver.get_model().unwrap());
+            println!("{}\n", g.color(Color::LightGray).bold());
+            if model.is_some() {
+                println!("{}", format!("{}", model.unwrap()).color(Color::LightCyan).bold());
+            }
         }
+        println!("{}", format!("{:?}", result).color(Color::LightCyan).bold());
+
     }
 
     pub(crate) fn handle_drop(
@@ -2229,7 +2571,7 @@ fn rustbv_merge(a:&RustBV, b: &RustBV) -> RustBV {
 fn rustbv_to_int(bv: &RustBV) -> u64 {
     let mut ans = 0;
     let mut base = 1;
-    for (index, tf) in bv.iter().enumerate() {
+    for tf in bv.iter() {
         ans = ans + base * (*tf as u64);
         base = base * 2;
     }
@@ -2256,6 +2598,3 @@ fn help_debug_goal_term<'tcx, 'ctx>(
     let dbg_bool = ast::Bool::new_const(ctx, debug_name);
     goal.assert(&dbg_bool);
 }
-
-// todo: dereference
-// todo: field to field

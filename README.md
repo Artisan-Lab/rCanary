@@ -22,15 +22,15 @@ Note: before running `install_rlc.sh` script, you should change current dir to t
 ### Building on a Unix-like system
 1. Make sure you have installed the dependencies:
 
-   * clang++ 12.0 or later
-   * llvm 12.0 or later
+   * clang++ 14.0 or later
+   * llvm 14.0 or later
    * python 3 or 2.7 
-   * z3 4.8 or later
+   * z3 4.10 or later
    * GNU make 3.81 or later 
-   * cmake 3.5 or later 
+   * cmake 3.24 or later 
    * git
-   * rustup 1.24 or later
-   * rustc/cargo nightly-2022-03-20 or later
+   * rustup 1.25 or later
+   * rustc/cargo nightly-2022-08-01
    * cargo components: rust-src/rustc-dev
 
 2. Clone the source with git:

@@ -67,13 +67,13 @@ impl<'tcx> NodeOrder<'tcx> {
                     (),
                 TerminatorKind::InlineAsm { .. } =>
                     (),
-                TerminatorKind::Call { destination, .. } => {
+                TerminatorKind::Call { target, .. } => {
                     // We check the destination due to following case.
                     // Terminator { source_info: SourceInfo { span: src/main.rs:100:9: 100:35 (#7), scope: scope[0] },
                     // kind: core::panicking::panic(const "assertion failed: index <= self.len") -> bb24 },
                     // destination -> None, cleanup -> Some(bb24)
-                    match destination {
-                        Some(dest) => { result.push(dest.1.as_usize()) },
+                    match target {
+                        Some(t) => { result.push(t.as_usize()) },
                         None => (),
                     }
                 }
