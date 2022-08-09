@@ -24,14 +24,14 @@ Note: before running `install_rlc.sh` script, you should change current dir to t
 
    * clang++ 14.0 or later
    * llvm 14.0 or later
-   * python 3 or 2.7 
+   * python 3.9 or later
    * z3 4.10 or later
    * GNU make 3.81 or later 
    * cmake 3.24 or later 
    * git
    * rustup 1.25 or later
    * rustc/cargo nightly-2022-08-01
-   * cargo components: rust-src/rustc-dev
+   * cargo components: rust-src, rustc-dev, llvm-tools-preview
 
 2. Clone the source with git:
 
