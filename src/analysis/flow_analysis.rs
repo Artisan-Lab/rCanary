@@ -2,7 +2,7 @@ use rustc_middle::ty::TyCtxt;
 use rustc_span::def_id::DefId;
 use rustc_middle::mir::Body;
 
-use crate::RlcGlobalCtxt;
+use crate::{Elapsed, rlc_info, RlcGlobalCtxt};
 use crate::type_analysis::{AdtOwner, OwnershipLayout, Unique};
 use crate::type_analysis::type_visitor::{mir_body, TyWithIndex};
 use crate::flow_analysis::ownership::{IntroVar, Taint};
@@ -120,6 +120,9 @@ impl<'tcx, 'a> FlowAnalysis<'tcx, 'a> {
         // this phase will generate the intro procedural visitor for us to visit the block
         // note that the inter procedural part is inside in this function but cod in module inter_visitor
         self.intro();
+
+        // rlc_info!("@@@@@@@@@@@@@Build Analysis:{:?}", self.rcx().get_time_build());
+        // rlc_info!("@@@@@@@@@@@@@Solve Analysis:{:?}", self.rcx().get_time_solve());
     }
 
 }
@@ -164,6 +167,8 @@ struct IntroFlowAnalysis<'tcx, 'ctx, 'a> {
     body: &'a Body<'tcx>,
     graph: &'a Graph,
     ref_fn_unique: &'a mut Unique,
+    elasped: Elapsed,
+    taint_flag: bool,
 }
 
 impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
@@ -186,6 +191,8 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
             body,
             graph,
             ref_fn_unique: unique,
+            elasped: (0, 0),
+            taint_flag: false,
         }
     }
 
@@ -234,6 +241,23 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
     pub fn graph(&self) -> &Graph {
         self.graph
     }
+
+    pub fn add_time_build(&mut self, time: i64) {
+        self.elasped.0 = self.elasped.0 + time;
+    }
+
+    pub fn get_time_build(&self) -> i64 {
+        self.elasped.0
+    }
+
+    pub fn add_time_solve(&mut self, time: i64) {
+        self.elasped.1 =  self.elasped.1 + time;
+    }
+
+    pub fn get_time_solve(&self) -> i64 {
+        self.elasped.1
+    }
+
 
 }
 

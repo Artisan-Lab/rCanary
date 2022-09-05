@@ -3,7 +3,10 @@ use std::env;
 use rustc_middle::ty::{Ty, TyCtxt};
 use rustc_span::def_id::DefId;
 
+use stopwatch::Stopwatch;
+
 use crate::context::RlcGlobalCtxt;
+use crate::rlc_info;
 use crate::type_analysis::ownership::RawTypeOwner;
 
 pub mod connect;
@@ -86,10 +89,18 @@ impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
     // The main phase and the starter function of Type Collector.
     // RLC will construct an instance of struct TypeCollector and call self.start to make analysis starting.
     pub fn start(&mut self) {
+
+        let mut sw = Stopwatch::start_new();
+
         // Get the analysis result from rlc phase llvm
-        self.connect();
+        // self.connect();
         // Get related adt types through visiting mir local
         self.visitor();
+
+        //rlc_info!("AdtDef Sum:{:?}", self.adt_owner().len());
+        //rlc_info!("Tymap Sum:{:?}", self.ty_map().len());
+        // rlc_info!("@@@@@@@@@@@@@Type Analysis:{:?}", sw.elapsed_ms());
+        sw.stop();
     }
 }
 
@@ -336,6 +347,46 @@ impl<'tcx, 'a> DefaultOwnership<'tcx, 'a> {
         self.ref_adt_owner
     }
 
+}
+
+#[derive(Clone)]
+pub struct FindPtr<'tcx> {
+    tcx: TyCtxt<'tcx>,
+    unique: Unique,
+    ptr: bool,
+}
+
+impl<'tcx> FindPtr<'tcx> {
+    pub fn new(
+        tcx: TyCtxt<'tcx>,
+    ) -> Self
+    {
+        Self {
+            tcx,
+            unique: Unique::default(),
+            ptr: false,
+        }
+    }
+
+    pub fn tcx(&self) -> TyCtxt<'tcx> {
+        self.tcx
+    }
+
+    pub fn unique(&self) -> &Unique {
+        &self.unique
+    }
+
+    pub fn unique_mut(&mut self) -> &mut Unique {
+        &mut self.unique
+    }
+
+    pub fn has_ptr(&self) -> bool {
+        self.ptr
+    }
+
+    pub fn set_ptr(&mut self, ptr: bool) {
+        self.ptr = ptr;
+    }
 }
 
 #[derive(Debug, Copy, Clone, Hash)]

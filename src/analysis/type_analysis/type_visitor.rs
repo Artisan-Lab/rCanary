@@ -9,9 +9,10 @@ use std::collections::HashMap;
 use std::ops::ControlFlow;
 
 use colorful::{Color, Colorful};
+use stopwatch::Stopwatch;
 
 use crate::display::{self, Display};
-use crate::type_analysis::{self, TypeAnalysis, OwnerPropagation, RawGeneric, RawGenericFieldSubst, RawGenericPropagation, RawTypeOwner, DefaultOwnership};
+use crate::type_analysis::{self, TypeAnalysis, OwnerPropagation, RawGeneric, RawGenericFieldSubst, RawGenericPropagation, RawTypeOwner, DefaultOwnership, FindPtr};
 
 pub(crate) fn mir_body(tcx: TyCtxt, def_id: DefId) -> &Body {
     let id = ty::WithOptConstParam::unknown(def_id);
@@ -70,9 +71,10 @@ impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
         }
 
         #[inline(always)]
-        fn show_mir_if_needed(body: &Body) {
+        fn show_mir_if_needed(did: DefId, body: &Body) {
             // Display the mir body if is Display MIR Verbose / Very Verbose
             if !display::is_display_verbose() { return; }
+            println!("{:?}", did);
             println!("{}", body.local_decls.display().color(Color::Green));
             println!("{}", body.basic_blocks().display().color(Color::LightGray));
         }
@@ -86,7 +88,7 @@ impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
             // Get the defid of current crate and get mir Body through this id
             let def_id = each_mir.to_def_id();
             let body = mir_body(tcx, def_id);
-            show_mir_if_needed(body);
+            // show_mir_if_needed(def_id, body);
 
             // Insert the defid to hashset if is not existed and visit the body
             if self.fn_set_mut().insert(def_id) {
@@ -245,6 +247,20 @@ impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
                                         let mut raw_generic_field_subst = RawGenericFieldSubst::new(self.tcx());
                                         g_ty.visit_with(&mut raw_generic_field_subst);
                                         if raw_generic_field_subst.contains_param() {
+
+                                            {
+                                                // To enhance the soundness of phantom unit, the struct should have a
+                                                // pointer to store T
+                                                let mut has_ptr = false;
+                                                for field in adt_def.all_fields() {
+                                                    let field_ty = field.ty(self.tcx(), substs);
+                                                    let mut find_ptr = FindPtr::new(self.tcx());
+                                                    field_ty.visit_with(&mut find_ptr);
+                                                    if find_ptr.has_ptr() { has_ptr = true; break; }
+                                                }
+                                                if has_ptr == false { return; }
+                                            }
+
                                             res.0 = RawTypeOwner::Owned;
                                             self.adt_owner_mut().insert(did, vec![res.clone()]);
                                             return;
@@ -533,7 +549,10 @@ impl<'tcx, 'a> TypeVisitor<'tcx> for OwnerPropagation<'tcx, 'a> {
                 let get_ans = get_ans[0].clone();
 
                 match get_ans.0 {
-                    RawTypeOwner::Owned => { self.ownership = RawTypeOwner::Owned; }
+                    RawTypeOwner::Owned => {
+                        self.ownership = RawTypeOwner::Owned;
+                        return ControlFlow::Break(());
+                    }
                     _ => (),
                 };
 
@@ -557,6 +576,45 @@ impl<'tcx, 'a> TypeVisitor<'tcx> for OwnerPropagation<'tcx, 'a> {
             },
         }
     }
+}
+
+impl<'tcx> TypeVisitor<'tcx> for FindPtr<'tcx> {
+    type BreakTy = ();
+
+    #[inline(always)]
+    fn visit_ty(&mut self, ty: Ty<'tcx>) -> ControlFlow<Self::BreakTy> {
+        match ty.kind() {
+            TyKind::Adt( adtdef, substs ) => {
+
+                if adtdef.is_struct() {
+                    if !self.unique_mut().insert(adtdef.did()) { return ControlFlow::CONTINUE; }
+
+                    for field in adtdef.all_fields() {
+                        let field_ty = field.ty(self.tcx(), substs);
+                        field_ty.visit_with(self);
+                    }
+                    self.unique_mut().remove(&adtdef.did());
+                }
+                ControlFlow::CONTINUE
+
+            },
+            TyKind::Tuple( .. ) => {
+                ty.super_visit_with(self)
+            },
+            TyKind::RawPtr( .. ) => {
+                self.set_ptr(true);
+                ControlFlow::Break(())
+            },
+            TyKind::Ref( .. ) => {
+                self.set_ptr(true);
+                ControlFlow::Break(())
+            },
+            _ => {
+                ControlFlow::CONTINUE
+            },
+        }
+    }
+
 }
 
 impl<'tcx, 'a> TypeVisitor<'tcx> for DefaultOwnership<'tcx, 'a>   {

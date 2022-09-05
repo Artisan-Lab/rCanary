@@ -15,7 +15,6 @@ extern crate rustc_target;
 extern crate serde;
 extern crate serde_json;
 
-
 #[macro_use]
 extern crate serde_derive;
 extern crate core;
@@ -45,6 +44,8 @@ pub static RLC_ROOT:&str = "/tmp/rlc";
 pub static RLC_LLVM_CACHE:&str = "/tmp/rlc/llvm-cache";
 pub static RLC_LLVM_IR:&str = "/tmp/rlc/llvm-ir";
 pub static RLC_LLVM_RES:&str = "/tmp/rlc/llvm-res";
+
+pub type Elapsed = (i64, i64);
 
 #[derive(Debug, Copy, Clone, Hash)]
 pub struct RlcConfig {

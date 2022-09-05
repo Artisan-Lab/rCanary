@@ -35,6 +35,7 @@ pub struct OwnershipLayoutResult {
     layout: OwnershipLayout,
     param: bool,
     requirement: bool,
+    owned: bool,
 }
 
 impl OwnershipLayoutResult {
@@ -43,6 +44,7 @@ impl OwnershipLayoutResult {
             layout: Vec::new(),
             param: false,
             requirement: false,
+            owned: false,
         }
     }
 
@@ -82,10 +84,22 @@ impl OwnershipLayoutResult {
         self.layout.is_empty()
     }
 
+    pub fn is_owned(&self) -> bool {
+        self.owned == true
+    }
+
+    pub fn set_owned(&mut self, o: bool) {
+        self.owned = o;
+    }
+
     pub fn update_from_default_ownership_visitor<'tcx, 'a>(&mut self, default_ownership: &mut DefaultOwnership<'tcx, 'a>) {
 
         if default_ownership.is_owning_true() || default_ownership.is_ptr_true() {
             self.set_requirement(true);
+        }
+
+        if default_ownership.is_owning_true() {
+            self.set_owned(true);
         }
 
         self.layout_mut().push(default_ownership.get_res());

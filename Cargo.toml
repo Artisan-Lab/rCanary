@@ -32,6 +32,7 @@ wait-timeout = "0.2.0"
 walkdir = "2.3.2"
 rustc-demangle = "0.1.21"
 colorful = "0.2.1"
+stopwatch = "0.0.7"
 
 [features]
 backtraces = ["snafu/backtraces", "snafu/backtraces-impl-backtrace-crate"]

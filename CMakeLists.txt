@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.5)
 
 # Use 'where clang' to find dir to clang and change CMAKE_C_COMPILER
-set(CMAKE_C_COMPILER             "/usr/local/opt/llvm/bin/clang")
+set(CMAKE_C_COMPILER             "/usr/bin/clang")
 set(CMAKE_C_FLAGS                "-Wall -std=c99")
 set(CMAKE_C_FLAGS_DEBUG          "-g")
 set(CMAKE_C_FLAGS_MINSIZEREL     "-Os -DNDEBUG")
@@ -9,7 +9,7 @@ set(CMAKE_C_FLAGS_RELEASE        "-O4 -DNDEBUG")
 set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g")
 
 # Use 'where clang++' to find dir to clang++ and change CMAKE_CXX_COMPILER
-set(CMAKE_CXX_COMPILER             "/usr/local/opt/llvm/bin/clang++")
+set(CMAKE_CXX_COMPILER             "/usr/bin/clang++")
 set(CMAKE_CXX_FLAGS                "${CMAKE_CXX_FLAGS} -O3 -std=c++11")
 set(CMAKE_CXX_FLAGS_DEBUG          "-g")
 set(CMAKE_CXX_FLAGS_MINSIZEREL     "-Os -DNDEBUG")
@@ -18,11 +18,11 @@ set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g")
 set(CMAKE_CXX_STANDARD 14)
 
 # Like before to modify llvm - bins
-set(CMAKE_AR      "/usr/local/opt/llvm/bin/llvm-ar")
-set(CMAKE_LINKER  "/usr/local/opt/llvm/bin/llvm-link")
-set(CMAKE_NM      "/usr/local/opt/llvm/bin/llvm-nm")
-set(CMAKE_OBJDUMP "/usr/local/opt/llvm/bin/llvm-objdump")
-set(CMAKE_RANLIB  "/usr/local/opt/llvm/bin/llvm-ranlib")
+set(CMAKE_AR      "/usr/bin/llvm-ar")
+set(CMAKE_LINKER  "/usr/bin/llvm-link")
+set(CMAKE_NM      "/usr/bin/llvm-nm")
+set(CMAKE_OBJDUMP "/usr/bin/llvm-objdump")
+set(CMAKE_RANLIB  "/usr/bin/llvm-ranlib")
 
 #your project name
 project(rlc_phase_llvm)

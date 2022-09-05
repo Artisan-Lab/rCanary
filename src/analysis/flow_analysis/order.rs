@@ -4,11 +4,15 @@ use crate::flow_analysis::{FlowAnalysis, NodeOrder};
 use crate::type_analysis::type_visitor::mir_body;
 
 use std::collections::BinaryHeap;
+use stopwatch::Stopwatch;
 
 impl<'tcx, 'a> FlowAnalysis<'tcx, 'a>{
     pub fn order(&mut self) {
         // Get the Global TyCtxt from rustc
         // Grasp all mir Keys defined in current crate
+
+        let mut sw = Stopwatch::start_new();
+
         let tcx = self.tcx();
         let mir_keys = tcx.mir_keys(());
 
@@ -24,6 +28,9 @@ impl<'tcx, 'a> FlowAnalysis<'tcx, 'a>{
             path.topo_order(&mut lev);
             self.rcx_mut().mir_graph_mut().insert(def_id, path.graph_mut().clone());
         }
+
+        self.rcx_mut().add_time_build(sw.elapsed_ms());
+        sw.stop();
     }
 }
 
