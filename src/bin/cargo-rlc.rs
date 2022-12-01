@@ -1,5 +1,10 @@
 #![cfg_attr(debug_assertions, allow(dead_code, unused_imports, unused_variables, unused_mut, dead_code))]
 
+use rlc::{RlcPhase, rlc_info,
+          RLC_DEFAULT_ARGS, RLC_ROOT, RLC_LLVM_CACHE, RLC_LLVM_IR};
+use rlc::components::log::{Verbosity, rlc_error_and_exit};
+use rlc::components::fs::{rlc_create_dir, rlc_remove_dir, rlc_copy_file, rlc_can_read_dir};
+
 use std::env;
 use std::iter::TakeWhile;
 use std::process::Command;
@@ -8,16 +13,9 @@ use std::time::Duration;
 use std::fmt::{Display, Formatter};
 use std::process;
 
+use rustc_version::VersionMeta;
 use wait_timeout::ChildExt;
 use walkdir::WalkDir;
-
-use rlc::log::{Verbosity, rlc_error_and_exit};
-use rlc::RlcPhase;
-use rlc::{rlc_info};
-use rlc::{RLC_DEFAULT_ARGS, RLC_ROOT, RLC_LLVM_CACHE, RLC_LLVM_IR};
-use rlc::fs::{rlc_create_dir, rlc_remove_dir, rlc_copy_file, rlc_can_read_dir};
-
-use rustc_version::VersionMeta;
 
 const CARGO_RLC_HELP: &str = r#"Runs RLC to test and check Rust crates
 

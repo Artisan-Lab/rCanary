@@ -1,6 +1,6 @@
-use super::TypeAnalysis;
 use crate::RLC_LLVM_IR;
-use crate::fs::{rlc_can_read_dir, rlc_read, rlc_demangle, rlc_create_file};
+use crate::analysis::type_analysis::TypeAnalysis;
+use crate::components::fs::{rlc_can_read_dir, rlc_read, rlc_demangle, rlc_create_file};
 
 use std::io::{BufRead, BufReader, Write};
 use std::collections::{HashMap, HashSet};

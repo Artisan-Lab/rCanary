@@ -1,23 +1,26 @@
-use std::borrow::Borrow;
 use rustc_span::def_id::DefId;
 use rustc_middle::ty::{self, Ty, TyKind, TypeFoldable, TypeVisitable};
-use rustc_middle::mir::{Body, BasicBlock, BasicBlockData, Statement, StatementKind, Terminator, Place, Rvalue};
-use rustc_middle::mir::{Local, Operand, ProjectionElem, CastKind, TerminatorKind};
+use rustc_middle::mir::{Body, BasicBlock, BasicBlockData, Statement, StatementKind,
+                        Terminator, Place, Rvalue, Local, Operand, ProjectionElem,
+                        CastKind, TerminatorKind};
 use rustc_target::abi::VariantIdx;
 
 use crate::{rlc_error, rlc_info};
-use crate::type_analysis::ownership::{OwnershipLayoutResult, RawTypeOwner};
-use crate::type_analysis::type_visitor::{mir_body, TyWithIndex};
-use crate::type_analysis::{DefaultOwnership, OwnershipLayout, RustBV, Unique};
-use crate::flow_analysis::{IntroFlowAnalysis, FlowAnalysis, IcxSliceFroBlock, is_z3_goal_verbose, is_icx_slice_verbose};
-use crate::flow_analysis::ownership::IntroVar;
-use crate::display::Display;
+use crate::analysis::{Rcx, RcxMut, IcxMut, IcxSliceMut};
+use crate::analysis::type_analysis::ownership::{OwnershipLayoutResult, RawTypeOwner};
+use crate::analysis::type_analysis::type_visitor::{mir_body, TyWithIndex};
+use crate::analysis::type_analysis::{DefaultOwnership, OwnershipLayout, RustBV, Unique};
+use crate::analysis::flow_analysis::{IntroFlowAnalysis, FlowAnalysis, IcxSliceFroBlock,
+                                     is_z3_goal_verbose, is_icx_slice_verbose};
+use crate::analysis::flow_analysis::ownership::IntroVar;
+use crate::components::display::Display;
 
 use colorful::{Color, Colorful};
 use z3::ast::{self, Ast};
 
 use std::ops::Add;
 use stopwatch::Stopwatch;
+use std::borrow::Borrow;
 // Fixme: arg.0
 // Fixme: arg enum
 
@@ -30,7 +33,7 @@ pub enum AsgnKind {
 }
 
 impl<'tcx, 'a> FlowAnalysis<'tcx, 'a>{
-    pub fn intro(&mut self) {
+    pub fn intro_run(&mut self) {
         let tcx = self.tcx();
         let mir_keys = tcx.mir_keys(());
         let mut unique = Unique::new();
@@ -41,10 +44,8 @@ impl<'tcx, 'a> FlowAnalysis<'tcx, 'a>{
 
             let def_id = each_mir.to_def_id();
             let body = mir_body(tcx, def_id);
-
-            // println!("{:?}",def_id);
-
-            // for loop free function analysis
+            println!("{:?}\n{}", def_id, body.display());
+            // for loop fee function analysis
             if body.basic_blocks.is_cfg_cyclic() { continue; }
 
             let mut cfg = z3::Config::new();
@@ -54,12 +55,11 @@ impl<'tcx, 'a> FlowAnalysis<'tcx, 'a>{
             let goal = z3::Goal::new(&ctx, true, false, false);
             let solver = z3::Solver::new(&ctx);
 
-            let mut intro = IntroFlowAnalysis::new(self.rcx, def_id, &mut unique);
+            let mut intro_visitor = IntroFlowAnalysis::new(self.rcx, def_id, &mut unique);
+            intro_visitor.visit_body(&ctx, &goal, &solver, body, &sw);
 
-            intro.visit_body(&ctx, &goal, &solver, body, &sw);
-
-            let sec_build = intro.get_time_build();
-            let sec_solve = intro.get_time_solve();
+            let sec_build = intro_visitor.get_time_build();
+            let sec_solve = intro_visitor.get_time_solve();
 
             self.rcx_mut().add_time_build(sec_build);
             self.rcx_mut().add_time_solve(sec_solve);

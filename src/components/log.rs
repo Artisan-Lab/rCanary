@@ -1,4 +1,5 @@
 use std::env;
+
 use chrono::Local;
 use fern::{self, Dispatch};
 use log::LevelFilter;

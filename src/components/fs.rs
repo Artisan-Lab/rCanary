@@ -1,11 +1,10 @@
-use crate::log::rlc_error_and_exit;
+use crate::components::log::rlc_error_and_exit;
 
-use rustc_demangle::try_demangle;
-
-use std::fs;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::Write;
 use std::path::Path;
+
+use rustc_demangle::try_demangle;
 
 pub fn rlc_create_dir<P: AsRef<Path>>(path: P, msg: impl AsRef<str>) {
     if fs::read_dir(&path).is_err() {

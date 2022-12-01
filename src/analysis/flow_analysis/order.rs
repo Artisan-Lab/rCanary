@@ -1,7 +1,8 @@
 use rustc_middle::mir::TerminatorKind;
 
-use crate::flow_analysis::{FlowAnalysis, NodeOrder};
-use crate::type_analysis::type_visitor::mir_body;
+use crate::analysis::RcxMut;
+use crate::analysis::flow_analysis::{FlowAnalysis, NodeOrder};
+use crate::analysis::type_analysis::type_visitor::mir_body;
 
 use std::collections::BinaryHeap;
 use stopwatch::Stopwatch;

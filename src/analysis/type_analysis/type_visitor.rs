@@ -1,18 +1,22 @@
-use rustc_middle::ty::{self, Ty, TyCtxt, TyKind, TypeVisitor, TypeFoldable, TypeVisitable, TypeSuperVisitable};
+use rustc_middle::ty::{self, Ty, TyCtxt, TyKind, TypeVisitor, TypeFoldable, TypeVisitable,
+                       TypeSuperVisitable};
 use rustc_middle::ty::subst::GenericArgKind;
 use rustc_middle::mir::visit::{Visitor, TyContext};
 use rustc_middle::mir::{Body, BasicBlock, BasicBlockData, Local, LocalDecl, Operand, TerminatorKind};
 use rustc_span::def_id::DefId;
 use rustc_target::abi::VariantIdx;
 
+use crate::components::display::{self, Display};
+use crate::analysis::RcxMut;
+use crate::analysis::type_analysis::{self, TypeAnalysis, OwnerPropagation, RawGeneric,
+                                     RawGenericFieldSubst, RawGenericPropagation, RawTypeOwner,
+                                     DefaultOwnership, FindPtr};
+
 use std::collections::HashMap;
 use std::ops::ControlFlow;
 
 use colorful::{Color, Colorful};
 use stopwatch::Stopwatch;
-
-use crate::display::{self, Display};
-use crate::type_analysis::{self, TypeAnalysis, OwnerPropagation, RawGeneric, RawGenericFieldSubst, RawGenericPropagation, RawTypeOwner, DefaultOwnership, FindPtr};
 
 pub(crate) fn mir_body(tcx: TyCtxt, def_id: DefId) -> &Body {
     let id = ty::WithOptConstParam::unknown(def_id);

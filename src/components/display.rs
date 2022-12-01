@@ -1,26 +1,27 @@
-use rustc_middle::mir::terminator::Terminator;
-use rustc_middle::mir::TerminatorKind;
-use rustc_middle::mir::{Operand, Rvalue, Statement, StatementKind, BasicBlock, BasicBlockData, Body, LocalDecl, LocalDecls};
+use rustc_middle::mir::{Operand, Rvalue, Statement, StatementKind, TerminatorKind, BasicBlock,
+                        BasicBlockData, Body, LocalDecl, LocalDecls, Terminator};
 use rustc_middle::ty::{self, TyKind};
 use rustc_index::vec::IndexVec;
 
 use std::env;
 
-// In this crate we will costume the display information for Compiler-Metadata by implementing
-// rlc::Display for target data structure.
-// If you want print these meg to terminal that makes debug easily, please add -v or -vv to rlc
-// that makes entire rlc verbose.
-pub trait Display {
-    fn display(&self) -> String;
-}
-
 const NEXT_LINE:&str = "\n";
 const PADDING:&str = "    ";
-const EXPLAIN:&str = "  |:->|  ";
+const EXPLAIN:&str = " @ ";
 
+type BasicBlocks<'tcx> = IndexVec<BasicBlock, BasicBlockData<'tcx>>;
+
+// In this crate we will costume the display information for Compiler-Metadata by implementing
+// rlc::Display for target data structure.
+// If you want output these messages that makes debug easily, please add -v or -vv to rlc
+// that makes entire rlc verbose.
+
+// MirDisplay is the controller in rlc to determine if the Display trait should be derived.
 #[derive(Debug, Copy, Clone, Hash)]
 pub enum MirDisplay {
+    // Basic MIR information for Debug
     Verbose,
+    // MIR associated with the type of statements and terminators, and the types of variables
     VeryVerobse,
     Disabled,
 }
@@ -44,6 +45,11 @@ pub fn is_display_very_verbose() -> bool {
         },
         _ => false,
     }
+}
+
+// This trait is a wrapper towards std::Display or std::Debug, and is to resolve orphan restrictions.
+pub trait Display {
+    fn display(&self) -> String;
 }
 
 impl<'tcx> Display for Terminator<'tcx> {
@@ -95,7 +101,7 @@ impl<'tcx> Display for TerminatorKind<'tcx>{
                         Operand::Constant(constant) => {
                                 match constant.literal.ty().kind() {
                                     ty::FnDef(id, ..) =>
-                                        s += &format!("Call FnDef ID is {}", id.index.as_usize()).as_str(),
+                                        s += &format!("Call: FnDid: {}", id.index.as_usize()).as_str(),
                                     _ => (),
                                 }
                         },
@@ -127,8 +133,7 @@ impl<'tcx> Display for StatementKind<'tcx> {
             s += EXPLAIN;
             match &self {
                 StatementKind::Assign(assign) => {
-                    s += "Assign";
-                    s += &format!("{}{:?} {}", EXPLAIN, assign.0, assign.1.display());
+                    s += &format!("{:?}={:?}{}", assign.0, assign.1, assign.1.display());
                 }
                 StatementKind::FakeRead( .. ) =>
                     s += "FakeRead",
@@ -162,37 +167,38 @@ impl<'tcx> Display for Rvalue<'tcx> {
     fn display(&self) -> String {
         let mut s = String::new();
         if is_display_very_verbose() {
+            s += EXPLAIN;
             match self {
                 Rvalue::Use( .. ) =>
-                    s += "Rvalue Use",
+                    s += "Use",
                 Rvalue::Repeat( .. ) =>
-                    s += "Rvalue Repeat",
+                    s += "Repeat",
                 Rvalue::Ref( .. ) =>
-                    s += "Rvalue Ref",
+                    s += "Ref",
                 Rvalue::ThreadLocalRef( .. ) =>
-                    s += "Rvalue ThreadLocalRef",
+                    s += "ThreadLocalRef",
                 Rvalue::AddressOf( .. ) =>
-                    s += "Rvalue AddressOf",
+                    s += "AddressOf",
                 Rvalue::Len( .. ) =>
-                    s += "Rvalue Len",
+                    s += "Len",
                 Rvalue::Cast( .. ) =>
-                    s += "Rvalue Cast",
+                    s += "Cast",
                 Rvalue::BinaryOp( .. ) =>
-                    s += "Rvalue BinaryOp",
+                    s += "BinaryOp",
                 Rvalue::CheckedBinaryOp( .. ) =>
-                    s += "Rvalue CheckedBinaryOp",
+                    s += "CheckedBinaryOp",
                 Rvalue::NullaryOp( .. ) =>
-                    s += "Rvalue NullaryOp",
+                    s += "NullaryOp",
                 Rvalue::UnaryOp( .. ) =>
-                    s += "Rvalue UnaryOp",
+                    s += "UnaryOp",
                 Rvalue::Discriminant( .. ) =>
-                    s += "Rvalue Discriminant",
+                    s += "Discriminant",
                 Rvalue::Aggregate( .. ) =>
-                    s += "Rvalue Aggregate",
+                    s += "Aggregate",
                 Rvalue::ShallowInitBox( .. ) =>
-                    s+= "Rvalue ShallowInitBox",
+                    s+= "ShallowInitBox",
                 Rvalue::CopyForDeref( .. ) =>
-                    s+= "Rvalue CopyForDeref",
+                    s+= "CopyForDeref",
             }
         } else {
             ()
@@ -200,8 +206,6 @@ impl<'tcx> Display for Rvalue<'tcx> {
         s
     }
 }
-
-type BasicBlocks<'tcx> = IndexVec<BasicBlock, BasicBlockData<'tcx>>;
 
 impl<'tcx> Display for BasicBlocks<'tcx> {
     fn display(&self) -> String {
@@ -219,7 +223,7 @@ impl<'tcx> Display for BasicBlockData<'tcx>  {
     fn display(&self) -> String {
         let mut s = String::new();
         if is_display_verbose() {
-            s += &format!("clean_up:{}{}{}", EXPLAIN, self.is_cleanup, NEXT_LINE);
+            s += &format!("CleanUp: {}{}", self.is_cleanup, NEXT_LINE);
             for stmt in self.statements.iter() {
                 s += &format!("{}{}", stmt.display(), NEXT_LINE);
             }

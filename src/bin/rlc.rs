@@ -4,22 +4,30 @@
 
 extern crate rustc_driver;
 extern crate rustc_interface;
+extern crate rustc_middle;
+extern crate rustc_metadata;
+extern crate rustc_data_structures;
+extern crate rustc_session;
 
 #[macro_use]
 extern crate log as rust_log;
 
-use rustc_driver::{Compilation,Callbacks};
-use rustc_interface::{interface::Compiler, Queries};
+use rustc_driver::{Compilation, Callbacks};
+use rustc_interface::{interface::Compiler, Queries, Config};
+use rustc_middle::ty::query::ExternProviders;
+use rustc_data_structures::sync::Lrc;
+use rustc_session::search_paths::PathKind;
 
 use std::env;
 use std::fmt::{Display, Formatter};
+use std::path::PathBuf;
 
 use rlc::{RlcConfig, compile_time_sysroot, RLC_DEFAULT_ARGS, start_analyzer};
 use rlc::analysis::flow_analysis::{IcxSliceDisplay, Z3GoalDisplay};
 use rlc::analysis::type_analysis::AdtOwnerDisplay;
-use rlc::display::MirDisplay;
-use rlc::grain::RlcGrain;
-use rlc::log::Verbosity;
+use rlc::components::display::MirDisplay;
+use rlc::components::grain::RlcGrain;
+use rlc::components::log::Verbosity;
 use rlc::rlc_info;
 
 #[derive(Copy, Clone)]
@@ -42,6 +50,18 @@ impl Display for RlcCompilerCalls {
 }
 
 impl Callbacks for RlcCompilerCalls {
+    fn config(&mut self, config: &mut Config) {
+        config.override_queries = Some(|_, _, external_providers| {
+           external_providers.used_crate_source = |tcx, cnum| {
+               let mut providers = ExternProviders::default();
+               rustc_metadata::provide_extern(&mut providers);
+               let mut crate_source = (providers.used_crate_source)(tcx, cnum);
+               Lrc::make_mut(&mut crate_source).rlib = Some((PathBuf::new(), PathKind::All));
+               crate_source
+           };
+        });
+    }
+
     fn after_analysis<'tcx>(
         &mut self,
         compiler: &Compiler,

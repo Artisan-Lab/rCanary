@@ -1,21 +1,21 @@
+pub mod ownership;
+pub mod order;
+pub mod intro_visitor;
+pub mod inter_visitor;
+
 use rustc_middle::ty::TyCtxt;
 use rustc_span::def_id::DefId;
 use rustc_middle::mir::Body;
 
 use crate::{Elapsed, rlc_info, RlcGlobalCtxt};
-use crate::type_analysis::{AdtOwner, OwnershipLayout, Unique};
-use crate::type_analysis::type_visitor::{mir_body, TyWithIndex};
-use crate::flow_analysis::ownership::{IntroVar, Taint};
+use crate::analysis::type_analysis::{AdtOwner, OwnershipLayout, Unique};
+use crate::analysis::type_analysis::type_visitor::{TyWithIndex, mir_body};
+use crate::analysis::flow_analysis::ownership::{IntroVar, Taint};
+use crate::analysis::{IcxMut, IcxSliceMut, Rcx, RcxMut};
 
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::env;
-
-pub mod ownership;
-pub mod order;
-pub mod solver;
-pub mod intro_visitor;
-pub mod inter_visitor;
 
 pub type MirGraph = HashMap<DefId, Graph>;
 pub type ToPo = Vec<usize>;
@@ -85,18 +85,6 @@ impl<'tcx, 'a> FlowAnalysis<'tcx, 'a> {
         }
     }
 
-    pub fn rcx(&self) -> &RlcGlobalCtxt<'tcx> {
-        self.rcx
-    }
-
-    pub fn rcx_mut(&mut self) -> &mut RlcGlobalCtxt<'tcx> {
-        &mut self.rcx
-    }
-
-    pub fn tcx(&self) -> TyCtxt<'tcx> {
-        self.rcx().tcx()
-    }
-
     pub fn fn_set(&self) -> &Unique {
         &self.fn_set
     }
@@ -119,12 +107,29 @@ impl<'tcx, 'a> FlowAnalysis<'tcx, 'a> {
         self.order();
         // this phase will generate the intro procedural visitor for us to visit the block
         // note that the inter procedural part is inside in this function but cod in module inter_visitor
-        self.intro();
+        self.intro_run();
 
         // rlc_info!("@@@@@@@@@@@@@Build Analysis:{:?}", self.rcx().get_time_build());
         // rlc_info!("@@@@@@@@@@@@@Solve Analysis:{:?}", self.rcx().get_time_solve());
     }
 
+}
+
+impl<'tcx, 'o, 'a> RcxMut<'tcx, 'o, 'a> for FlowAnalysis<'tcx, 'a> {
+    #[inline(always)]
+    fn rcx(&'o self) -> &'o RlcGlobalCtxt<'tcx> {
+        self.rcx
+    }
+
+    #[inline(always)]
+    fn rcx_mut(&'o mut self) -> &'o mut RlcGlobalCtxt<'tcx> {
+        &mut self.rcx
+    }
+
+    #[inline(always)]
+    fn tcx(&'o self) -> TyCtxt<'tcx> {
+        self.rcx().tcx()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -157,6 +162,40 @@ impl<'tcx> NodeOrder<'tcx> {
         &mut self.graph
     }
 
+}
+
+struct InterFlowAnalysis<'tcx, 'ctx, 'a> {
+    rcx:&'a RlcGlobalCtxt<'tcx>,
+    ifa: IntroFlowAnalysis<'tcx, 'ctx, 'a>,
+    root_did: DefId,
+    root_body: &'a Body<'tcx>,
+}
+
+impl<'tcx, 'ctx, 'a> InterFlowAnalysis<'tcx, 'ctx, 'a> {
+    pub fn new(
+        rcx: &'a RlcGlobalCtxt<'tcx>,
+        did: DefId,
+        unique: &'a mut Unique,
+    ) -> Self
+    {
+        Self {
+            rcx,
+            ifa: IntroFlowAnalysis::new(rcx, did, unique),
+            root_did: did,
+            root_body: mir_body(rcx.tcx(), did),
+        }
+    }
+
+}
+
+impl<'tcx, 'ctx, 'o, 'a> Rcx<'tcx, 'o, 'a> for InterFlowAnalysis<'tcx, 'ctx, 'a> {
+    #[inline(always)]
+    fn rcx(&'o self) -> &'a RlcGlobalCtxt<'tcx> {
+        self.rcx
+    }
+
+    #[inline(always)]
+    fn tcx(&'o self) -> TyCtxt<'tcx> { self.rcx.tcx() }
 }
 
 struct IntroFlowAnalysis<'tcx, 'ctx, 'a> {
@@ -194,28 +233,6 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
             elasped: (0, 0),
             taint_flag: false,
         }
-    }
-
-    pub fn rcx(&self) -> &RlcGlobalCtxt<'tcx> {
-        self.rcx
-    }
-
-    pub fn tcx(&self) -> TyCtxt<'tcx> { self.rcx().tcx() }
-
-    pub fn icx(&self) -> &IntroFlowContext<'tcx, 'ctx> {
-        &self.icx
-    }
-
-    pub fn icx_mut(&mut self) -> &mut IntroFlowContext<'tcx, 'ctx> {
-        &mut self.icx
-    }
-
-    pub fn icx_slice(&self) -> &IcxSliceFroBlock<'tcx, 'ctx> {
-        &self.icx_slice
-    }
-
-    pub fn icx_slice_mut(&mut self) -> &mut IcxSliceFroBlock<'tcx, 'ctx> {
-        &mut self.icx_slice
     }
 
     pub fn did(&self) -> DefId {
@@ -258,11 +275,44 @@ impl<'tcx, 'ctx, 'a> IntroFlowAnalysis<'tcx, 'ctx, 'a> {
         self.elasped.1
     }
 
+}
 
+impl<'tcx, 'ctx, 'o, 'a> Rcx<'tcx, 'o, 'a> for IntroFlowAnalysis<'tcx, 'ctx, 'a> {
+    #[inline(always)]
+    fn rcx(&'o self) -> &'a RlcGlobalCtxt<'tcx> {
+        self.rcx
+    }
+
+    #[inline(always)]
+    fn tcx(&'o self) -> TyCtxt<'tcx> { self.rcx.tcx() }
+}
+
+impl<'tcx, 'ctx, 'o, 'a> IcxMut<'tcx, 'ctx, 'o> for IntroFlowAnalysis<'tcx, 'ctx, 'a> {
+    #[inline(always)]
+    fn icx(&'o self) -> &'o IntroFlowContext<'tcx, 'ctx> {
+        &self.icx
+    }
+
+    #[inline(always)]
+    fn icx_mut(&'o mut self) -> &'o mut IntroFlowContext<'tcx, 'ctx> {
+        &mut self.icx
+    }
+}
+
+impl<'tcx, 'ctx, 'o, 'a> IcxSliceMut<'tcx, 'ctx, 'o> for IntroFlowAnalysis<'tcx, 'ctx, 'a> {
+    #[inline(always)]
+    fn icx_slice(&'o self) -> &'o IcxSliceFroBlock<'tcx, 'ctx> {
+        &self.icx_slice
+    }
+
+    #[inline(always)]
+    fn icx_slice_mut(&'o mut self) -> &'o mut IcxSliceFroBlock<'tcx, 'ctx> {
+        &mut self.icx_slice
+    }
 }
 
 #[derive(Debug, Clone)]
-struct IntroFlowContext<'tcx, 'ctx> {
+pub struct IntroFlowContext<'tcx, 'ctx> {
     taint: IOPairForGraph<Taint<'tcx>>,
     var: IOPairForGraph<IntroVar<'ctx>>,
     len: IOPairForGraph<usize>,
@@ -416,7 +466,7 @@ impl<'tcx, 'ctx, 'icx> IntroFlowContext<'tcx, 'ctx> {
 }
 
 #[derive(Debug, Clone, Default)]
-struct InOutPair<T: Debug + Clone + Default> {
+pub struct InOutPair<T: Debug + Clone + Default> {
     i: Vec<T>,
     o: Vec<T>,
 }
@@ -453,7 +503,7 @@ impl<T> InOutPair<T>
 }
 
 #[derive(Debug, Clone, Default)]
-struct IOPairForGraph<T: Debug + Clone + Default> {
+pub struct IOPairForGraph<T: Debug + Clone + Default> {
     pair_graph: Vec<InOutPair<T>>,
 }
 
@@ -476,7 +526,7 @@ impl<T> IOPairForGraph<T>
 }
 
 #[derive(Clone, Default)]
-struct IcxSliceFroBlock<'tcx, 'ctx> {
+pub struct IcxSliceFroBlock<'tcx, 'ctx> {
     taint: Vec<Taint<'tcx>>,
     var: Vec<IntroVar<'ctx>>,
     len: Vec<usize>,

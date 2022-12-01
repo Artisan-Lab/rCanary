@@ -1,10 +1,10 @@
 use rustc_middle::ty::TyCtxt;
 
-use std::collections::HashMap;
-
 use crate::{RlcConfig, Elapsed};
-use crate::type_analysis::AdtOwner;
-use crate::flow_analysis::MirGraph;
+use crate::analysis::flow_analysis::MirGraph;
+use crate::analysis::type_analysis::AdtOwner;
+
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct RlcGlobalCtxt<'tcx> {

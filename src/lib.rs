@@ -5,6 +5,8 @@
 #![cfg_attr(debug_assertions, allow(dead_code, unused_imports, unused_variables, unused_mut, dead_code, unused_must_use))]
 #![cfg_attr(not(debug_assertions), allow(dead_code, unused_imports, unused_variables, unused_mut, dead_code, unused_must_use))]
 
+pub mod analysis;
+pub mod components;
 
 extern crate rustc_middle;
 extern crate rustc_hir;
@@ -21,20 +23,12 @@ extern crate core;
 
 use rustc_middle::ty::TyCtxt;
 
-use crate::grain::RlcGrain;
-use crate::log::Verbosity;
-use crate::context::RlcGlobalCtxt;
-use crate::display::MirDisplay;
-use crate::type_analysis::AdtOwnerDisplay;
-use crate::analysis::{type_analysis, flow_analysis};
-use crate::flow_analysis::{IcxSliceDisplay, Z3GoalDisplay};
-
-pub mod context;
-pub mod display;
-pub mod fs;
-pub mod grain;
-pub mod log;
-pub mod analysis;
+use crate::components::grain::RlcGrain;
+use crate::components::log::Verbosity;
+use crate::components::context::RlcGlobalCtxt;
+use crate::components::display::MirDisplay;
+use crate::analysis::flow_analysis::{FlowAnalysis, IcxSliceDisplay, Z3GoalDisplay};
+use crate::analysis::type_analysis::{TypeAnalysis, AdtOwnerDisplay};
 
 // Insert rustc arguments at the beginning of the argument list that RLC wants to be
 // set per default, for maximal validation power.
@@ -166,12 +160,12 @@ pub fn start_analyzer(tcx: TyCtxt, config: RlcConfig) {
     run_analyzer(
         "Type Analysis",
         ||
-            type_analysis::TypeAnalysis::new(rcx).start()
+            TypeAnalysis::new(rcx).start()
     );
 
     run_analyzer(
         "Flow Analysis",
         ||
-            flow_analysis::FlowAnalysis::new(rcx).start()
+            FlowAnalysis::new(rcx).start()
     );
 }
