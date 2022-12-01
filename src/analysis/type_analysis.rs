@@ -1,17 +1,20 @@
-use std::collections::{HashMap, HashSet};
-use std::env;
-use rustc_middle::ty::{Ty, TyCtxt};
-use rustc_span::def_id::DefId;
-
-use stopwatch::Stopwatch;
-
-use crate::context::RlcGlobalCtxt;
-use crate::rlc_info;
-use crate::type_analysis::ownership::RawTypeOwner;
-
 pub mod connect;
 pub mod type_visitor;
 pub mod ownership;
+
+use rustc_middle::ty::{Ty, TyCtxt};
+use rustc_span::def_id::DefId;
+
+use crate::rlc_info;
+use crate::analysis::RcxMut;
+use crate::analysis::flow_analysis::FlowAnalysis;
+use crate::analysis::type_analysis::ownership::RawTypeOwner;
+use crate::components::context::RlcGlobalCtxt;
+
+use std::collections::{HashMap, HashSet};
+use std::env;
+
+use stopwatch::Stopwatch;
 
 type TyMap<'tcx> = HashMap<Ty<'tcx>, String>;
 type OwnerUnit = (RawTypeOwner, Vec<bool>);
@@ -40,18 +43,6 @@ impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
             ty_map: HashMap::new(),
             adt_recorder: HashSet::new(),
         }
-    }
-
-    pub fn rcx(&self) -> &RlcGlobalCtxt<'tcx> {
-        &self.rcx
-    }
-
-    pub fn rcx_mut(&mut self) -> &mut RlcGlobalCtxt<'tcx> {
-        &mut self.rcx
-    }
-
-    pub fn tcx(&self) -> TyCtxt<'tcx> {
-        self.rcx().tcx()
     }
 
     pub fn ty_map(&self) -> &TyMap<'tcx> {
@@ -83,7 +74,7 @@ impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
     }
 
     pub fn adt_owner_mut(&mut self) -> &mut AdtOwner {
-        self.rcx.adt_owner_mut()
+        self.rcx_mut().adt_owner_mut()
     }
 
     // The main phase and the starter function of Type Collector.
@@ -101,6 +92,23 @@ impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
         //rlc_info!("Tymap Sum:{:?}", self.ty_map().len());
         // rlc_info!("@@@@@@@@@@@@@Type Analysis:{:?}", sw.elapsed_ms());
         sw.stop();
+    }
+}
+
+impl<'tcx, 'o, 'a> RcxMut<'tcx, 'o, 'a> for TypeAnalysis<'tcx, 'a> {
+    #[inline(always)]
+    fn rcx(&'o self) -> &'o RlcGlobalCtxt<'tcx> {
+        self.rcx
+    }
+
+    #[inline(always)]
+    fn rcx_mut(&'o mut self) -> &'o mut RlcGlobalCtxt<'tcx> {
+        &mut self.rcx
+    }
+
+    #[inline(always)]
+    fn tcx(&'o self) -> TyCtxt<'tcx> {
+        self.rcx().tcx()
     }
 }
 

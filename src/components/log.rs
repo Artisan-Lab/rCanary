@@ -30,7 +30,7 @@ impl Verbosity {
                 .format(|callback, args, record| {
                     callback.finish(format_args!(
                         "{} |RLC OUTPUT-{:5}| {}",
-                        Local::now().date(),
+                        Local::now().date_naive(),
                         record.level(),
                         args,
                     ))

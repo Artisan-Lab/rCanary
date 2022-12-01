@@ -78,9 +78,9 @@ impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
         fn show_mir_if_needed(did: DefId, body: &Body) {
             // Display the mir body if is Display MIR Verbose / Very Verbose
             if !display::is_display_verbose() { return; }
-            println!("{:?}", did);
+            println!("{}", did.display().color(Color::LightRed));
             println!("{}", body.local_decls.display().color(Color::Green));
-            println!("{}", body.basic_blocks().display().color(Color::LightGray));
+            println!("{}", body.basic_blocks().display().color(Color::LightGoldenrod2a));
         }
 
         // Get the Global TyCtxt from rustc
@@ -92,7 +92,7 @@ impl<'tcx, 'a> TypeAnalysis<'tcx, 'a> {
             // Get the defid of current crate and get mir Body through this id
             let def_id = each_mir.to_def_id();
             let body = mir_body(tcx, def_id);
-            // show_mir_if_needed(def_id, body);
+            show_mir_if_needed(def_id, body);
 
             // Insert the defid to hashset if is not existed and visit the body
             if self.fn_set_mut().insert(def_id) {

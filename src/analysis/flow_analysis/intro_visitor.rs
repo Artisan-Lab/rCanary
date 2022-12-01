@@ -44,7 +44,6 @@ impl<'tcx, 'a> FlowAnalysis<'tcx, 'a>{
 
             let def_id = each_mir.to_def_id();
             let body = mir_body(tcx, def_id);
-            println!("{:?}\n{}", def_id, body.display());
             // for loop fee function analysis
             if body.basic_blocks.is_cfg_cyclic() { continue; }
 

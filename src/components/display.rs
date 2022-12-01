@@ -2,6 +2,7 @@ use rustc_middle::mir::{Operand, Rvalue, Statement, StatementKind, TerminatorKin
                         BasicBlockData, Body, LocalDecl, LocalDecls, Terminator};
 use rustc_middle::ty::{self, TyKind};
 use rustc_index::vec::IndexVec;
+use rustc_span::def_id::DefId;
 
 use std::env;
 
@@ -276,5 +277,11 @@ impl<'tcx> Display for TyKind<'tcx> {
             s += &format!("{:?}", self);
         }
         s
+    }
+}
+
+impl Display for DefId {
+    fn display(&self) -> String {
+        format!("{:?}", self)
     }
 }
