@@ -1,14 +1,14 @@
-# RLC -- Rust Leakage Checker
+# rCanary -- Rust Leak Checker through Semi-automated Memory Boundary
 
-This is the main source code repository for rlc.
-It contains the source code of **rlc**, **cargo-rlc**, **rust-llvm-heap-analysis-tool (rlc_phase_llvm)** and the **rlc-constraint-solver**.
+This is the main source code repository for rCanary.
+It contains the source code of **rlc**, **cargo-rlc**, **rust-llvm-heap-analysis-tool (rlc_phase_llvm)**.
 
 Note: this **README** is for _users_ rather than _contributors_. 
 
 ## Quick Start
 ### Installing from Source Code
 
-The rlc build system uses a shell script called `install.sh` to build all components, which manages the compiling process.
+The build system uses a shell script called `install.sh` to build all components, which manages the compiling process.
 It lives in the root of the rlc project.
 
 `install_rlc.sh` script can be run directly on most **unix-like** systems, such as mac-os, linux, etc.
@@ -36,11 +36,9 @@ Note: before running `install_rlc.sh` script, you should change current dir to t
 2. Clone the source with git:
 
 ```shell
-git clone https://github.com/vaynnecol/rlc.git
+git clone https://github.com/Artisan-Lab/rCanary.git
 cd rlc
 ```
-
-To be done: not upload yet
 
 3. Configure the build settings:
 
@@ -110,6 +108,20 @@ pacman -S git \
 Note: we do not advice the user to use the windows as host platform.
 
 ## Using RLC
-... to be done
+You can directly use rCanary by the command:
+```shell
+cargo rlc
+```
+The directory must be the root of a cargo project, and note that our system is not supported **virtual workspace**.
 
-including the optional arguments for rlc, the emitter dir and introduction, and the logging-output system (unfinished yet)
+If you want to check virtual workspace project, you need to go down to the sub folder of this project and check the root
+of the cargo project.
+
+Including the optional arguments for rCanary, the emitter dir and introduction, and the logging-output system:
+```shell
+"-MIR=V" => show Rust MIR,
+"-MIR=VV" => show Rust MIR verbosely,
+"-ADT=V" => show the results of ADT-DEF analysis,
+"-Z3-GOAL=V" => show the Z3 goal (constraints) of each MIR,
+"-ICX-SLICE=V" => show the contexts of each program point for debugging,
+```
